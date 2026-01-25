@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services import statistics
+from app.version import get_version
 
 router = APIRouter(tags=["pages"])
 
@@ -16,7 +17,10 @@ templates = Jinja2Templates(directory=templates_path)
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Render the main timer page"""
-    return templates.TemplateResponse("index.html", {"request": request, "active_page": "timer"})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "active_page": "timer", "version": get_version()},
+    )
 
 
 @router.get("/statistics", response_class=HTMLResponse)
@@ -25,5 +29,10 @@ async def statistics_page(request: Request, db: Session = Depends(get_db)):
     stats = statistics.get_statistics(db)
     return templates.TemplateResponse(
         "statistics.html",
-        {"request": request, "active_page": "statistics", "stats": stats},
+        {
+            "request": request,
+            "active_page": "statistics",
+            "stats": stats,
+            "version": get_version(),
+        },
     )

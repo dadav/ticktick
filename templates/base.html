@@ -1,23 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TickTick{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>TickTick</h1>
             <nav>
-                <a href="/" class="{% if active_page == 'timer' %}active{% endif %}">Timer</a>
-                <a href="/statistics" class="{% if active_page == 'statistics' %}active{% endif %}">Statistics</a>
+                <a href="/" class="{% if active_page == 'timer' %}active{% endif %}">Zeiterfassung</a>
+                <a href="/statistics" class="{% if active_page == 'statistics' %}active{% endif %}">Statistik</a>
             </nav>
         </header>
         <main>
             {% block content %}{% endblock %}
         </main>
+        <footer class="app-footer">
+            <span class="version">v{{ version }}</span>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Design wechseln" title="Design wechseln">&#9788;</button>
+        </footer>
     </div>
     {% block scripts %}{% endblock %}
 </body>

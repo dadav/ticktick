@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}TickTick - Statistics{% endblock %}
+{% block title %}TickTick - Statistik{% endblock %}
 
 {% block content %}
 <div class="stats-section">
-    <h2>This Week</h2>
+    <h2>Diese Woche</h2>
     <div class="stats-row">
-        <span class="label">Total hours:</span>
+        <span class="label">Gesamtstunden:</span>
         <span class="value">{{ stats.this_week.total_formatted }} / {{ stats.this_week.target_formatted }}</span>
     </div>
     <div class="progress-bar">
@@ -14,37 +14,37 @@
         <div class="fill {% if progress >= 100 %}overtime{% elif progress < 80 %}behind{% endif %}" style="width: {{ [progress, 100] | min }}%"></div>
     </div>
     <div class="stats-row">
-        <span class="label">Days worked:</span>
+        <span class="label">Arbeitstage:</span>
         <span class="value">{{ stats.this_week.days_worked }}</span>
     </div>
     <div class="stats-row">
-        <span class="label">Average per day:</span>
+        <span class="label">Durchschnitt pro Tag:</span>
         <span class="value">{{ stats.this_week.avg_per_day_formatted }}</span>
     </div>
     <div class="stats-row {% if stats.this_week.overtime_seconds >= 0 %}positive{% else %}negative{% endif %}">
-        <span class="label">{% if stats.this_week.overtime_seconds >= 0 %}Overtime:{% else %}Remaining:{% endif %}</span>
+        <span class="label">{% if stats.this_week.overtime_seconds >= 0 %}Überstunden:{% else %}Fehlstunden:{% endif %}</span>
         <span class="value">{{ stats.this_week.overtime_formatted }}</span>
     </div>
 </div>
 
 <div class="stats-section">
-    <h2>This Month</h2>
+    <h2>Dieser Monat</h2>
     <div class="stats-row">
-        <span class="label">Total hours:</span>
+        <span class="label">Gesamtstunden:</span>
         <span class="value">{{ stats.this_month.total_formatted }}</span>
     </div>
     <div class="stats-row">
-        <span class="label">Days worked:</span>
+        <span class="label">Arbeitstage:</span>
         <span class="value">{{ stats.this_month.days_worked }}</span>
     </div>
     <div class="stats-row">
-        <span class="label">Average per day:</span>
+        <span class="label">Durchschnitt pro Tag:</span>
         <span class="value">{{ stats.this_month.avg_per_day_formatted }}</span>
     </div>
 </div>
 
 <div class="stats-section">
-    <h2>Recent Sessions</h2>
+    <h2>Letzte Einträge</h2>
     <div class="sessions-list">
         {% for session in stats.recent_sessions %}
         <div class="session-item">
@@ -54,7 +54,7 @@
             <span class="overtime {% if session.overtime_seconds >= 0 %}positive{% else %}negative{% endif %}">{{ session.overtime_formatted }}</span>
         </div>
         {% else %}
-        <p style="color: #888; text-align: center; padding: 1rem;">No completed sessions yet.</p>
+        <p style="color: #888; text-align: center; padding: 1rem;">Noch keine abgeschlossenen Einträge.</p>
         {% endfor %}
     </div>
 </div>

@@ -1,61 +1,61 @@
 {% extends "base.html" %}
 
-{% block title %}TickTick - Timer{% endblock %}
+{% block title %}TickTick - Zeiterfassung{% endblock %}
 
 {% block content %}
 <div class="timer-display">
     <div class="time" id="current-time">00:00:00</div>
-    <div class="status" id="status-text">Idle</div>
+    <div class="status" id="status-text">Bereit</div>
 </div>
 
 <div class="controls">
     <button id="btn-start" class="btn btn-primary">Start</button>
     <button id="btn-pause" class="btn btn-secondary" disabled>Pause</button>
-    <button id="btn-continue" class="btn btn-secondary" disabled>Continue</button>
-    <button id="btn-stop" class="btn btn-success" disabled>Stop</button>
+    <button id="btn-continue" class="btn btn-secondary" disabled>Weiter</button>
+    <button id="btn-stop" class="btn btn-success" disabled>Stopp</button>
 </div>
 
 <div class="controls-secondary">
-    <button id="btn-reset" class="btn btn-danger" disabled>Reset</button>
+    <button id="btn-reset" class="btn btn-danger" disabled>Verwerfen</button>
 </div>
 
 <div class="summary" id="summary" style="display: none;">
-    <h2>Today's Work Summary</h2>
+    <h2>Heutige Arbeitszeit</h2>
     <div class="summary-row">
-        <span class="label">Started at:</span>
+        <span class="label">Gestartet um:</span>
         <span class="value" id="start-time">--:--</span>
     </div>
     <div class="summary-row">
-        <span class="label">Net work time:</span>
+        <span class="label">Nettoarbeitszeit:</span>
         <span class="value" id="net-time">00:00:00</span>
     </div>
     <div class="summary-row">
-        <span class="label">Pauses:</span>
-        <span class="value" id="pause-info">0 pauses (00:00:00)</span>
+        <span class="label">Pausen:</span>
+        <span class="value" id="pause-info">0 Pausen (00:00:00)</span>
     </div>
     <div class="summary-row" id="lunch-row">
-        <span class="label">Lunch break:</span>
-        <span class="value" id="lunch-info">Not yet (after 6h)</span>
+        <span class="label">Mittagspause:</span>
+        <span class="value" id="lunch-info">Noch nicht (ab 6 Std.)</span>
     </div>
     <div class="summary-row" id="overtime-row">
-        <span class="label">Overtime:</span>
+        <span class="label">Überstunden:</span>
         <span class="value" id="overtime">--:--:--</span>
     </div>
     <hr>
     <div class="summary-row">
-        <span class="label">Earliest leave (6h):</span>
+        <span class="label">Frühester Feierabend (6 Std.):</span>
         <span class="value" id="earliest-leave">--:--</span>
     </div>
     <div class="summary-row highlight">
-        <span class="label">Normal leave (8h12m):</span>
+        <span class="label">Regulärer Feierabend (8 Std. 12 Min.):</span>
         <span class="value" id="normal-leave">--:--</span>
     </div>
     <div class="summary-row">
-        <span class="label">Latest leave (10h):</span>
+        <span class="label">Spätester Feierabend (10 Std.):</span>
         <span class="value" id="latest-leave">--:--</span>
     </div>
     <div class="summary-row">
-        <span class="label">Remaining for daily:</span>
+        <span class="label">Verbleibend für Tagessoll:</span>
         <span class="value" id="remaining">--:--:--</span>
     </div>
 </div>

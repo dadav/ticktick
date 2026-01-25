@@ -19,6 +19,12 @@ const elements = {
     remaining: document.getElementById('remaining'),
 };
 
+const statusLabels = {
+    idle: 'Bereit',
+    running: 'Läuft',
+    paused: 'Pausiert'
+};
+
 function formatDuration(seconds) {
     const h = Math.floor(Math.abs(seconds) / 3600);
     const m = Math.floor((Math.abs(seconds) % 3600) / 60);
@@ -29,14 +35,14 @@ function formatDuration(seconds) {
 
 function formatTime(dateStr) {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function updateUI(data) {
     const { status, session, calculations } = data;
 
     // Update status
-    elements.statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    elements.statusText.textContent = statusLabels[status] || status;
     elements.statusText.className = 'status ' + status;
 
     // Update buttons
@@ -51,13 +57,15 @@ function updateUI(data) {
         elements.summary.style.display = 'block';
         elements.startTime.textContent = formatTime(session.start_time);
         elements.netTime.textContent = session.net_work_formatted;
-        elements.pauseInfo.textContent = `${session.pause_count} pause(s) (${formatDuration(session.total_pause_seconds)})`;
+
+        const pauseLabel = session.pause_count === 1 ? 'Pause' : 'Pausen';
+        elements.pauseInfo.textContent = `${session.pause_count} ${pauseLabel} (${formatDuration(session.total_pause_seconds)})`;
 
         if (calculations) {
             if (calculations.lunch_break_applies) {
-                elements.lunchInfo.textContent = 'Applied (30 min)';
+                elements.lunchInfo.textContent = 'Abgezogen (30 Min.)';
             } else if (calculations.lunch_break_at) {
-                elements.lunchInfo.textContent = `After ${calculations.lunch_break_at}`;
+                elements.lunchInfo.textContent = `Ab ${calculations.lunch_break_at} Uhr`;
             }
 
             // Update overtime display
@@ -70,9 +78,9 @@ function updateUI(data) {
                 elements.overtimeRow.classList.remove('positive');
             }
 
-            elements.earliestLeave.textContent = calculations.earliest_leave;
-            elements.normalLeave.textContent = calculations.normal_leave;
-            elements.latestLeave.textContent = calculations.latest_leave;
+            elements.earliestLeave.textContent = calculations.earliest_leave + ' Uhr';
+            elements.normalLeave.textContent = calculations.normal_leave + ' Uhr';
+            elements.latestLeave.textContent = calculations.latest_leave + ' Uhr';
             elements.remaining.textContent = calculations.remaining_for_daily;
         }
     } else {
@@ -87,7 +95,7 @@ async function fetchStatus() {
         const data = await response.json();
         updateUI(data);
     } catch (error) {
-        console.error('Failed to fetch status:', error);
+        console.error('Fehler beim Abrufen des Status:', error);
     }
 }
 
@@ -98,10 +106,10 @@ async function sendAction(action) {
         if (data.success) {
             fetchStatus();
         } else {
-            console.error('Action failed:', data.message);
+            console.error('Aktion fehlgeschlagen:', data.message);
         }
     } catch (error) {
-        console.error('Failed to send action:', error);
+        console.error('Fehler beim Senden der Aktion:', error);
     }
 }
 
@@ -111,7 +119,7 @@ elements.btnPause.addEventListener('click', () => sendAction('pause'));
 elements.btnContinue.addEventListener('click', () => sendAction('continue'));
 elements.btnStop.addEventListener('click', () => sendAction('stop'));
 elements.btnReset.addEventListener('click', () => {
-    if (confirm('Are you sure you want to reset? This will discard the current session.')) {
+    if (confirm('Möchtest du wirklich verwerfen? Der aktuelle Eintrag wird nicht gespeichert.')) {
         sendAction('reset');
     }
 });
