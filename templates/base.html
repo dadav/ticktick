@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TickTick{% endblock %}</title>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('ticktick-theme');
+            var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        })();
+    </script>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/theme.js" defer></script>
 </head>
 <body>
     <div class="container">
