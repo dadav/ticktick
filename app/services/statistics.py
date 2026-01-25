@@ -4,7 +4,7 @@ from sqlalchemy import func
 
 from app.models import WorkSession
 from app.schemas import StatisticsResponse, WeekSummary, MonthSummary, SessionSummary
-from app.services.calculations import format_duration
+from app.services.calculations import format_duration, calculate_overtime_seconds
 from app.config import WEEKLY_HOURS
 
 
@@ -83,16 +83,21 @@ def get_statistics(db: Session) -> StatisticsResponse:
         .all()
     )
 
-    recent_sessions = [
-        SessionSummary(
-            date=s.date.strftime("%Y-%m-%d"),
-            start_time=s.start_time.strftime("%H:%M"),
-            end_time=s.end_time.strftime("%H:%M") if s.end_time else None,
-            net_work_formatted=format_duration(s.net_seconds or 0),
-            status=s.status,
+    recent_sessions = []
+    for s in recent:
+        net_seconds = s.net_seconds or 0
+        overtime = calculate_overtime_seconds(net_seconds)
+        recent_sessions.append(
+            SessionSummary(
+                date=s.date.strftime("%Y-%m-%d"),
+                start_time=s.start_time.strftime("%H:%M"),
+                end_time=s.end_time.strftime("%H:%M") if s.end_time else None,
+                net_work_formatted=format_duration(net_seconds),
+                overtime_seconds=overtime,
+                overtime_formatted=format_duration(overtime),
+                status=s.status,
+            )
         )
-        for s in recent
-    ]
 
     return StatisticsResponse(
         this_week=week_summary,

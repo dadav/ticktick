@@ -171,6 +171,14 @@ nav a.active {
     color: #4caf50;
 }
 
+.summary-row.positive {
+    color: #4caf50;
+}
+
+.summary-row.negative {
+    color: #ff9800;
+}
+
 .summary-row .label {
     color: #888;
 }
@@ -247,6 +255,20 @@ nav a.active {
 .session-item .duration {
     font-family: 'Courier New', monospace;
     color: #00d4ff;
+}
+
+.session-item .overtime {
+    font-family: 'Courier New', monospace;
+    min-width: 80px;
+    text-align: right;
+}
+
+.session-item .overtime.positive {
+    color: #4caf50;
+}
+
+.session-item .overtime.negative {
+    color: #ff9800;
 }
 
 .progress-bar {

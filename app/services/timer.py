@@ -7,10 +7,11 @@ from app.services.calculations import (
     calculate_net_work_seconds,
     calculate_pause_seconds,
     calculate_earliest_leave,
+    calculate_normal_leave,
     calculate_latest_leave,
     calculate_lunch_break_time,
     calculate_remaining_for_daily,
-    calculate_lunch_break_minutes,
+    calculate_overtime_seconds,
     format_duration,
     format_time,
 )
@@ -62,13 +63,17 @@ def get_status(db: Session) -> StatusResponse:
 
     net_work_minutes = net_work_seconds / 60
     lunch_applies = net_work_minutes > LUNCH_THRESHOLD_HOURS * 60
+    overtime_seconds = calculate_overtime_seconds(net_work_seconds)
 
     calculations = Calculations(
         lunch_break_applies=lunch_applies,
         lunch_break_at=format_time(calculate_lunch_break_time(session.start_time, pause_minutes)) if not lunch_applies else None,
         earliest_leave=format_time(calculate_earliest_leave(session.start_time, pause_minutes)),
+        normal_leave=format_time(calculate_normal_leave(session.start_time, pause_minutes)),
         latest_leave=format_time(calculate_latest_leave(session.start_time, pause_minutes)),
         remaining_for_daily=format_duration(calculate_remaining_for_daily(net_work_seconds)),
+        overtime_seconds=overtime_seconds,
+        overtime_formatted=format_duration(overtime_seconds),
     )
 
     return StatusResponse(status=status, session=session_info, calculations=calculations)

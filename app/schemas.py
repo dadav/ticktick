@@ -15,9 +15,12 @@ class SessionInfo(BaseModel):
 class Calculations(BaseModel):
     lunch_break_applies: bool
     lunch_break_at: str | None
-    earliest_leave: str
-    latest_leave: str
+    earliest_leave: str  # 6h work
+    normal_leave: str    # 8h12m work (daily requirement)
+    latest_leave: str    # 10h work (max)
     remaining_for_daily: str
+    overtime_seconds: int
+    overtime_formatted: str
 
 
 class StatusResponse(BaseModel):
@@ -37,6 +40,8 @@ class SessionSummary(BaseModel):
     start_time: str
     end_time: str | None
     net_work_formatted: str
+    overtime_seconds: int
+    overtime_formatted: str
     status: str
 
 

@@ -11,16 +11,20 @@ const elements = {
     netTime: document.getElementById('net-time'),
     pauseInfo: document.getElementById('pause-info'),
     lunchInfo: document.getElementById('lunch-info'),
+    overtime: document.getElementById('overtime'),
+    overtimeRow: document.getElementById('overtime-row'),
     earliestLeave: document.getElementById('earliest-leave'),
+    normalLeave: document.getElementById('normal-leave'),
     latestLeave: document.getElementById('latest-leave'),
     remaining: document.getElementById('remaining'),
 };
 
 function formatDuration(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const h = Math.floor(Math.abs(seconds) / 3600);
+    const m = Math.floor((Math.abs(seconds) % 3600) / 60);
+    const s = Math.abs(seconds) % 60;
+    const sign = seconds < 0 ? '-' : '';
+    return `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function formatTime(dateStr) {
@@ -55,7 +59,19 @@ function updateUI(data) {
             } else if (calculations.lunch_break_at) {
                 elements.lunchInfo.textContent = `After ${calculations.lunch_break_at}`;
             }
+
+            // Update overtime display
+            elements.overtime.textContent = calculations.overtime_formatted;
+            if (calculations.overtime_seconds >= 0) {
+                elements.overtimeRow.classList.add('positive');
+                elements.overtimeRow.classList.remove('negative');
+            } else {
+                elements.overtimeRow.classList.add('negative');
+                elements.overtimeRow.classList.remove('positive');
+            }
+
             elements.earliestLeave.textContent = calculations.earliest_leave;
+            elements.normalLeave.textContent = calculations.normal_leave;
             elements.latestLeave.textContent = calculations.latest_leave;
             elements.remaining.textContent = calculations.remaining_for_daily;
         }

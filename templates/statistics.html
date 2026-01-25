@@ -51,6 +51,7 @@
             <span class="date">{{ session.date }}</span>
             <span class="times">{{ session.start_time }} - {{ session.end_time or '--:--' }}</span>
             <span class="duration">{{ session.net_work_formatted }}</span>
+            <span class="overtime {% if session.overtime_seconds >= 0 %}positive{% else %}negative{% endif %}">{{ session.overtime_formatted }}</span>
         </div>
         {% else %}
         <p style="color: #888; text-align: center; padding: 1rem;">No completed sessions yet.</p>
