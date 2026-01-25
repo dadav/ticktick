@@ -1,0 +1,21 @@
+services:
+  ticktick:
+    build: .
+    container_name: ticktick
+    ports:
+      - "${TICKTICK_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TICKTICK_DB_PATH=/app/data/ticktick.db
+      - TICKTICK_WEEKLY_HOURS=${TICKTICK_WEEKLY_HOURS:-41}
+      - TICKTICK_MAX_DAILY_HOURS=${TICKTICK_MAX_DAILY_HOURS:-10}
+      - TICKTICK_LUNCH_THRESHOLD=${TICKTICK_LUNCH_THRESHOLD:-6}
+      - TICKTICK_LUNCH_DURATION=${TICKTICK_LUNCH_DURATION:-30}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}TickTick - Timer{% endblock %}
+
+{% block content %}
+<div class="timer-display">
+    <div class="time" id="current-time">00:00:00</div>
+    <div class="status" id="status-text">Idle</div>
+</div>
+
+<div class="controls">
+    <button id="btn-start" class="btn btn-primary">Start</button>
+    <button id="btn-pause" class="btn btn-secondary" disabled>Pause</button>
+    <button id="btn-continue" class="btn btn-secondary" disabled>Continue</button>
+    <button id="btn-stop" class="btn btn-success" disabled>Stop</button>
+</div>
+
+<div class="controls-secondary">
+    <button id="btn-reset" class="btn btn-danger" disabled>Reset</button>
+</div>
+
+<div class="summary" id="summary" style="display: none;">
+    <h2>Today's Work Summary</h2>
+    <div class="summary-row">
+        <span class="label">Started at:</span>
+        <span class="value" id="start-time">--:--</span>
+    </div>
+    <div class="summary-row">
+        <span class="label">Net work time:</span>
+        <span class="value" id="net-time">00:00:00</span>
+    </div>
+    <div class="summary-row">
+        <span class="label">Pauses:</span>
+        <span class="value" id="pause-info">0 pauses (00:00:00)</span>
+    </div>
+    <div class="summary-row" id="lunch-row">
+        <span class="label">Lunch break:</span>
+        <span class="value" id="lunch-info">Not yet (after 6h)</span>
+    </div>
+    <hr>
+    <div class="summary-row highlight">
+        <span class="label">Earliest leave:</span>
+        <span class="value" id="earliest-leave">--:--</span>
+    </div>
+    <div class="summary-row highlight">
+        <span class="label">Latest leave:</span>
+        <span class="value" id="latest-leave">--:--</span>
+    </div>
+    <div class="summary-row">
+        <span class="label">Remaining for daily:</span>
+        <span class="value" id="remaining">--:--:--</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/timer.js"></script>
+{% endblock %}

@@ -1,0 +1,272 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+header h1 {
+    font-size: 2rem;
+    color: #00d4ff;
+    margin-bottom: 1rem;
+}
+
+nav {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+nav a {
+    color: #888;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+nav a:hover {
+    color: #fff;
+    background: #2a2a4e;
+}
+
+nav a.active {
+    color: #00d4ff;
+    background: #2a2a4e;
+}
+
+.timer-display {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.time {
+    font-size: 4rem;
+    font-weight: 300;
+    font-family: 'Courier New', monospace;
+    color: #00d4ff;
+    text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+.status {
+    font-size: 1.2rem;
+    color: #888;
+    margin-top: 0.5rem;
+}
+
+.status.running {
+    color: #4caf50;
+}
+
+.status.paused {
+    color: #ff9800;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.controls-secondary {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.btn {
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #00d4ff;
+    color: #1a1a2e;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #00b8e6;
+}
+
+.btn-secondary {
+    background: #3a3a5e;
+    color: #fff;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #4a4a6e;
+}
+
+.btn-success {
+    background: #4caf50;
+    color: #fff;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #43a047;
+}
+
+.btn-danger {
+    background: #f44336;
+    color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #e53935;
+}
+
+.summary {
+    background: #2a2a4e;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.summary h2 {
+    font-size: 1.2rem;
+    color: #00d4ff;
+    margin-bottom: 1rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #3a3a5e;
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+}
+
+.summary-row.highlight {
+    color: #4caf50;
+}
+
+.summary-row .label {
+    color: #888;
+}
+
+.summary-row .value {
+    font-family: 'Courier New', monospace;
+}
+
+.summary hr {
+    border: none;
+    border-top: 1px solid #3a3a5e;
+    margin: 1rem 0;
+}
+
+/* Statistics page styles */
+.stats-section {
+    background: #2a2a4e;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.stats-section h2 {
+    font-size: 1.2rem;
+    color: #00d4ff;
+    margin-bottom: 1rem;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+}
+
+.stats-row .label {
+    color: #888;
+}
+
+.stats-row .value {
+    font-family: 'Courier New', monospace;
+}
+
+.stats-row.positive {
+    color: #4caf50;
+}
+
+.stats-row.negative {
+    color: #ff9800;
+}
+
+.sessions-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #1a1a2e;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.session-item .date {
+    color: #888;
+    min-width: 100px;
+}
+
+.session-item .times {
+    color: #aaa;
+}
+
+.session-item .duration {
+    font-family: 'Courier New', monospace;
+    color: #00d4ff;
+}
+
+.progress-bar {
+    background: #1a1a2e;
+    border-radius: 4px;
+    height: 8px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+
+.progress-bar .fill {
+    background: #00d4ff;
+    height: 100%;
+    transition: width 0.3s;
+}
+
+.progress-bar .fill.overtime {
+    background: #4caf50;
+}
+
+.progress-bar .fill.behind {
+    background: #ff9800;
+}
