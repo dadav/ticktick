@@ -391,6 +391,15 @@ nav a.active {
     transition: all 0.2s;
 }
 
+/* Set toggle icon via CSS to prevent FOUC */
+.theme-toggle::before {
+    content: '\263C'; /* Sun icon - shown in dark mode, means "switch to light" */
+}
+
+[data-theme="light"] .theme-toggle::before {
+    content: '\263E'; /* Moon icon - shown in light mode, means "switch to dark" */
+}
+
 .theme-toggle:hover {
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);

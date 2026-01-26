@@ -18,6 +18,60 @@ def get_month_start(date: datetime) -> datetime:
     return date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+def calculate_average_times(sessions: list[WorkSession]) -> tuple[str | None, str | None]:
+    """
+    Calculate average start and end times from a list of sessions.
+
+    Returns tuple of (average_start_time, average_end_time) in HH:MM format.
+    Returns None for each if no valid data is available.
+    """
+    if not sessions:
+        return None, None
+
+    # Calculate average start time
+    # Convert each start time to seconds since midnight
+    start_times_seconds = []
+    for session in sessions:
+        if session.start_time:
+            start = session.start_time
+            seconds_since_midnight = start.hour * 3600 + start.minute * 60 + start.second
+            start_times_seconds.append(seconds_since_midnight)
+
+    average_start = None
+    if start_times_seconds:
+        avg_start_seconds = sum(start_times_seconds) // len(start_times_seconds)
+        hours, remainder = divmod(avg_start_seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        average_start = f"{hours:02d}:{minutes:02d}"
+
+    # Calculate average end time
+    # Only include sessions with an end_time
+    end_times_seconds = []
+    for session in sessions:
+        if session.end_time:
+            end = session.end_time
+            seconds_since_midnight = end.hour * 3600 + end.minute * 60 + end.second
+            end_times_seconds.append(seconds_since_midnight)
+
+    average_end = None
+    if end_times_seconds:
+        avg_end_seconds = sum(end_times_seconds) // len(end_times_seconds)
+        hours, remainder = divmod(avg_end_seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        average_end = f"{hours:02d}:{minutes:02d}"
+
+    return average_start, average_end
+
+
+def calculate_monthly_target_seconds(days_worked: int) -> int:
+    """
+    Calculate monthly target based on days worked.
+    Uses daily requirement derived from weekly hours.
+    """
+    daily_requirement_seconds = int((WEEKLY_HOURS * 3600) / 5)  # 5 workdays per week
+    return days_worked * daily_requirement_seconds
+
+
 def get_statistics(db: Session) -> StatisticsResponse:
     """Get comprehensive statistics"""
     now = datetime.now()
@@ -50,6 +104,7 @@ def get_statistics(db: Session) -> StatisticsResponse:
     week_days_worked = len(set(s.date for s in week_sessions))
     week_avg_seconds = week_total_seconds // week_days_worked if week_days_worked > 0 else 0
     week_overtime_seconds = week_total_seconds - week_target_seconds
+    week_average_start, week_average_end = calculate_average_times(week_sessions)
 
     week_summary = WeekSummary(
         total_seconds=week_total_seconds,
@@ -60,18 +115,27 @@ def get_statistics(db: Session) -> StatisticsResponse:
         avg_per_day_formatted=format_duration(week_avg_seconds),
         overtime_seconds=week_overtime_seconds,
         overtime_formatted=format_duration(week_overtime_seconds),
+        average_start_time=week_average_start,
+        average_end_time=week_average_end,
     )
 
     # Calculate month summary
     month_total_seconds = sum(s.net_seconds or 0 for s in month_sessions)
     month_days_worked = len(set(s.date for s in month_sessions))
     month_avg_seconds = month_total_seconds // month_days_worked if month_days_worked > 0 else 0
+    month_target_seconds = calculate_monthly_target_seconds(month_days_worked)
+    month_overtime_seconds = month_total_seconds - month_target_seconds
+    month_average_start, month_average_end = calculate_average_times(month_sessions)
 
     month_summary = MonthSummary(
         total_seconds=month_total_seconds,
         total_formatted=format_duration(month_total_seconds),
         days_worked=month_days_worked,
         avg_per_day_formatted=format_duration(month_avg_seconds),
+        overtime_seconds=month_overtime_seconds,
+        overtime_formatted=format_duration(month_overtime_seconds),
+        average_start_time=month_average_start,
+        average_end_time=month_average_end,
     )
 
     # Get recent sessions (last 10)

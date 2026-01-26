@@ -11,8 +11,13 @@
             if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script src="/static/js/theme.js" defer></script>
+    <style>
+        /* Critical CSS to prevent theme toggle flash */
+        .theme-toggle::before { content: '\263C'; }
+        [data-theme="light"] .theme-toggle::before { content: '\263E'; }
+    </style>
+    <link rel="stylesheet" href="/static/css/style.css?v={{ version }}">
+    <script src="/static/js/theme.js?v={{ version }}" defer></script>
 </head>
 <body>
     <div class="container">
@@ -20,7 +25,7 @@
             <h1>TickTick</h1>
             <div class="header-meta">
                 <span class="version">v{{ version }}</span>
-                <button id="theme-toggle" class="theme-toggle" aria-label="Design wechseln" title="Design wechseln">&#9788;</button>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Design wechseln" title="Design wechseln"></button>
             </div>
             <nav>
                 <a href="/" class="{% if active_page == 'timer' %}active{% endif %}">Zeiterfassung</a>

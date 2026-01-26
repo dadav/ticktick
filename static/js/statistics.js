@@ -1,5 +1,5 @@
 async function deleteSession(sessionId) {
-    if (!confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
+    if (!confirm('Moechtest du diesen Eintrag wirklich loeschen?')) {
         return;
     }
 
@@ -26,8 +26,8 @@ async function deleteSession(sessionId) {
             alert('Fehler: ' + data.message);
         }
     } catch (error) {
-        console.error('Fehler beim Löschen:', error);
-        alert('Fehler beim Löschen des Eintrags.');
+        console.error('Fehler beim Loeschen:', error);
+        alert('Fehler beim Loeschen des Eintrags.');
     }
 }
 
@@ -73,12 +73,23 @@ async function refreshStatistics() {
             weekOvertimeRow.classList.remove('positive', 'negative');
             if (stats.this_week.overtime_seconds >= 0) {
                 weekOvertimeRow.classList.add('positive');
-                weekOvertimeLabel.textContent = 'Überstunden:';
+                weekOvertimeLabel.textContent = 'Ueberstunden:';
             } else {
                 weekOvertimeRow.classList.add('negative');
                 weekOvertimeLabel.textContent = 'Fehlstunden:';
             }
             weekOvertime.textContent = stats.this_week.overtime_formatted;
+        }
+
+        // Update weekly average times
+        const weekAverageStart = document.getElementById('week-average-start');
+        if (weekAverageStart) {
+            weekAverageStart.textContent = stats.this_week.average_start_time || '--:--';
+        }
+
+        const weekAverageEnd = document.getElementById('week-average-end');
+        if (weekAverageEnd) {
+            weekAverageEnd.textContent = stats.this_week.average_end_time || '--:--';
         }
 
         // Update monthly statistics
@@ -97,6 +108,33 @@ async function refreshStatistics() {
             monthAvg.textContent = stats.this_month.avg_per_day_formatted;
         }
 
+        // Update monthly overtime
+        const monthOvertimeRow = document.getElementById('month-overtime-row');
+        const monthOvertimeLabel = document.getElementById('month-overtime-label');
+        const monthOvertime = document.getElementById('month-overtime');
+        if (monthOvertimeRow && monthOvertimeLabel && monthOvertime) {
+            monthOvertimeRow.classList.remove('positive', 'negative');
+            if (stats.this_month.overtime_seconds >= 0) {
+                monthOvertimeRow.classList.add('positive');
+                monthOvertimeLabel.textContent = 'Ueberstunden:';
+            } else {
+                monthOvertimeRow.classList.add('negative');
+                monthOvertimeLabel.textContent = 'Fehlstunden:';
+            }
+            monthOvertime.textContent = stats.this_month.overtime_formatted;
+        }
+
+        // Update monthly average times
+        const monthAverageStart = document.getElementById('month-average-start');
+        if (monthAverageStart) {
+            monthAverageStart.textContent = stats.this_month.average_start_time || '--:--';
+        }
+
+        const monthAverageEnd = document.getElementById('month-average-end');
+        if (monthAverageEnd) {
+            monthAverageEnd.textContent = stats.this_month.average_end_time || '--:--';
+        }
+
     } catch (error) {
         console.error('Fehler beim Aktualisieren der Statistiken:', error);
     }
@@ -107,6 +145,6 @@ function checkEmptyList() {
     const remainingSessions = sessionsList.querySelectorAll('.session-item');
 
     if (remainingSessions.length === 0) {
-        sessionsList.innerHTML = '<p style="color: #888; text-align: center; padding: 1rem;">Noch keine abgeschlossenen Einträge.</p>';
+        sessionsList.innerHTML = '<p style="color: #888; text-align: center; padding: 1rem;">Noch keine abgeschlossenen Eintraege.</p>';
     }
 }

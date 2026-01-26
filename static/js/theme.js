@@ -27,12 +27,12 @@ function updateToggleButton(currentTheme) {
     const toggleBtn = document.getElementById('theme-toggle');
     if (!toggleBtn) return;
 
+    // Icon is set via CSS ::before to prevent FOUC
+    // Only update accessibility attributes here
     if (currentTheme === 'light') {
-        toggleBtn.textContent = '\u263E';
         toggleBtn.setAttribute('aria-label', 'Zu dunklem Modus wechseln');
         toggleBtn.setAttribute('title', 'Zu dunklem Modus wechseln');
     } else {
-        toggleBtn.textContent = '\u263C';
         toggleBtn.setAttribute('aria-label', 'Zu hellem Modus wechseln');
         toggleBtn.setAttribute('title', 'Zu hellem Modus wechseln');
     }

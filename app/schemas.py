@@ -55,6 +55,8 @@ class WeekSummary(BaseModel):
     avg_per_day_formatted: str
     overtime_seconds: int
     overtime_formatted: str
+    average_start_time: str | None  # HH:MM format
+    average_end_time: str | None    # HH:MM format
 
 
 class MonthSummary(BaseModel):
@@ -62,6 +64,10 @@ class MonthSummary(BaseModel):
     total_formatted: str
     days_worked: int
     avg_per_day_formatted: str
+    overtime_seconds: int
+    overtime_formatted: str
+    average_start_time: str | None  # HH:MM format
+    average_end_time: str | None    # HH:MM format
 
 
 class StatisticsResponse(BaseModel):
