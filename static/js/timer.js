@@ -10,7 +10,6 @@ const elements = {
     startTime: document.getElementById('start-time'),
     netTime: document.getElementById('net-time'),
     pauseInfo: document.getElementById('pause-info'),
-    lunchInfo: document.getElementById('lunch-info'),
     overtime: document.getElementById('overtime'),
     overtimeRow: document.getElementById('overtime-row'),
     earliestLeave: document.getElementById('earliest-leave'),
@@ -62,12 +61,6 @@ function updateUI(data) {
         elements.pauseInfo.textContent = `${session.pause_count} ${pauseLabel} (${formatDuration(session.total_pause_seconds)})`;
 
         if (calculations) {
-            if (calculations.lunch_break_applies) {
-                elements.lunchInfo.textContent = 'Abgezogen (30 Min.)';
-            } else if (calculations.lunch_break_at) {
-                elements.lunchInfo.textContent = `Ab ${calculations.lunch_break_at} Uhr`;
-            }
-
             // Update overtime display
             elements.overtime.textContent = calculations.overtime_formatted;
             if (calculations.overtime_seconds >= 0) {

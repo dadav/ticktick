@@ -63,7 +63,21 @@ header {
 header h1 {
     font-size: 2rem;
     color: var(--color-accent);
+    margin-bottom: 0.5rem;
+}
+
+/* Version and theme toggle below headline */
+.header-meta {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
     margin-bottom: 1rem;
+}
+
+.header-meta .version {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
 }
 
 nav {
@@ -323,6 +337,24 @@ nav a.active {
     color: var(--color-warning);
 }
 
+.session-item .btn-delete {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.session-item .btn-delete:hover {
+    background: var(--color-danger);
+    color: #fff;
+}
+
 .progress-bar {
     background: var(--color-bg-primary);
     border-radius: 4px;
@@ -345,22 +377,6 @@ nav a.active {
     background: var(--color-warning);
 }
 
-/* Footer styles */
-.app-footer {
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
-    text-align: center;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-}
-
-.app-footer .version {
-    color: var(--color-text-muted);
-    font-size: 0.8rem;
-}
 
 /* Theme toggle button */
 .theme-toggle {
@@ -464,6 +480,7 @@ nav a.active {
         flex-direction: column;
         gap: 0.25rem;
         padding: 0.5rem;
+        position: relative;
     }
 
     .session-item .date {
@@ -479,9 +496,10 @@ nav a.active {
         text-align: left;
     }
 
-    .app-footer {
-        flex-direction: column;
-        gap: 0.5rem;
+    .session-item .btn-delete {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
     }
 }
 

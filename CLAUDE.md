@@ -83,6 +83,7 @@ All settings via environment variables (prefix `TICKTICK_`):
 | POST | `/api/stop` | Stop and save session |
 | POST | `/api/reset` | Discard current session |
 | GET | `/api/statistics/summary` | Weekly/monthly stats |
+| DELETE | `/api/sessions/{id}` | Delete a completed session by ID |
 
 ## CI/CD
 

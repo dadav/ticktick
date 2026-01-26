@@ -206,3 +206,27 @@ def reset_timer(db: Session) -> ActionResponse:
     db.commit()
 
     return ActionResponse(success=True, message="Timer reset (session discarded)", status="idle")
+
+
+def delete_session(db: Session, session_id: int) -> ActionResponse:
+    """Delete a completed work session by ID"""
+    state = get_or_create_timer_state(db)
+
+    # Cannot delete the currently active session
+    if state.current_session_id == session_id:
+        return ActionResponse(
+            success=False,
+            message="Cannot delete the currently active session",
+            status="running" if state.is_running else "paused"
+        )
+
+    session = db.query(WorkSession).filter(WorkSession.id == session_id).first()
+
+    if not session:
+        return ActionResponse(success=False, message="Session not found", status="idle")
+
+    # Delete the session (cascade will delete related pause periods)
+    db.delete(session)
+    db.commit()
+
+    return ActionResponse(success=True, message="Session deleted", status="idle")

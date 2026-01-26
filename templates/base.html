@@ -18,6 +18,10 @@
     <div class="container">
         <header>
             <h1>TickTick</h1>
+            <div class="header-meta">
+                <span class="version">v{{ version }}</span>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Design wechseln" title="Design wechseln">&#9788;</button>
+            </div>
             <nav>
                 <a href="/" class="{% if active_page == 'timer' %}active{% endif %}">Zeiterfassung</a>
                 <a href="/statistics" class="{% if active_page == 'statistics' %}active{% endif %}">Statistik</a>
@@ -26,10 +30,6 @@
         <main>
             {% block content %}{% endblock %}
         </main>
-        <footer class="app-footer">
-            <span class="version">v{{ version }}</span>
-            <button id="theme-toggle" class="theme-toggle" aria-label="Design wechseln" title="Design wechseln">&#9788;</button>
-        </footer>
     </div>
     {% block scripts %}{% endblock %}
 </body>

@@ -36,6 +36,7 @@ class ActionResponse(BaseModel):
 
 
 class SessionSummary(BaseModel):
+    id: int
     date: str
     start_time: str
     end_time: str | None

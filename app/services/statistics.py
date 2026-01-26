@@ -89,6 +89,7 @@ def get_statistics(db: Session) -> StatisticsResponse:
         overtime = calculate_overtime_seconds(net_seconds)
         recent_sessions.append(
             SessionSummary(
+                id=s.id,
                 date=s.date.strftime("%Y-%m-%d"),
                 start_time=s.start_time.strftime("%H:%M"),
                 end_time=s.end_time.strftime("%H:%M") if s.end_time else None,

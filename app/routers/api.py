@@ -49,3 +49,9 @@ def reset_timer(db: Session = Depends(get_db)):
 def get_statistics(db: Session = Depends(get_db)):
     """Get weekly/monthly statistics"""
     return statistics.get_statistics(db)
+
+
+@router.delete("/sessions/{session_id}", response_model=ActionResponse)
+def delete_session(session_id: int, db: Session = Depends(get_db)):
+    """Delete a work session by ID"""
+    return timer.delete_session(db, session_id)
