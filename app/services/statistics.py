@@ -4,7 +4,7 @@ from sqlalchemy import func
 
 from app.models import WorkSession
 from app.schemas import StatisticsResponse, WeekSummary, MonthSummary, SessionSummary
-from app.services.calculations import format_duration, calculate_overtime_seconds
+from app.services.calculations import format_duration, format_duration_short, calculate_overtime_seconds
 from app.config import WEEKLY_HOURS
 
 
@@ -157,9 +157,9 @@ def get_statistics(db: Session) -> StatisticsResponse:
                 date=s.date.strftime("%Y-%m-%d"),
                 start_time=s.start_time.strftime("%H:%M"),
                 end_time=s.end_time.strftime("%H:%M") if s.end_time else None,
-                net_work_formatted=format_duration(net_seconds),
+                net_work_formatted=format_duration_short(net_seconds),
                 overtime_seconds=overtime,
-                overtime_formatted=format_duration(overtime),
+                overtime_formatted=format_duration_short(overtime),
                 status=s.status,
             )
         )

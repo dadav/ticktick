@@ -20,6 +20,14 @@ def format_duration(seconds: int) -> str:
     return f"{sign}{int(hours):02d}:{int(minutes):02d}:{int(secs):02d}"
 
 
+def format_duration_short(seconds: int) -> str:
+    """Format seconds as HH:MM (without seconds)"""
+    hours, remainder = divmod(abs(seconds), 3600)
+    minutes, _ = divmod(remainder, 60)
+    sign = "-" if seconds < 0 else ""
+    return f"{sign}{int(hours):02d}:{int(minutes):02d}"
+
+
 def format_time(dt: datetime) -> str:
     """Format datetime as HH:MM"""
     return dt.strftime("%H:%M")
