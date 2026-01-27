@@ -74,3 +74,25 @@ class StatisticsResponse(BaseModel):
     this_week: WeekSummary
     this_month: MonthSummary
     recent_sessions: list[SessionSummary]
+
+
+class PausePeriodInfo(BaseModel):
+    id: int
+    pause_start: str  # HH:MM format
+    pause_end: str | None  # HH:MM format, None if pause is still active
+    duration_formatted: str  # Duration as formatted string
+
+
+class SessionDetailResponse(BaseModel):
+    id: int
+    date: str
+    start_time: str  # HH:MM format
+    end_time: str | None  # HH:MM format
+    net_work_formatted: str
+    gross_work_formatted: str
+    total_pause_formatted: str
+    overtime_seconds: int
+    overtime_formatted: str
+    status: str
+    pause_count: int
+    pauses: list[PausePeriodInfo]

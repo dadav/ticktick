@@ -3,8 +3,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models import WorkSession
-from app.schemas import StatisticsResponse, WeekSummary, MonthSummary, SessionSummary
-from app.services.calculations import format_duration, format_duration_short, calculate_overtime_seconds
+from app.schemas import (
+    StatisticsResponse,
+    WeekSummary,
+    MonthSummary,
+    SessionSummary,
+    SessionDetailResponse,
+    PausePeriodInfo,
+)
+from app.services.calculations import (
+    format_duration,
+    format_duration_short,
+    calculate_overtime_seconds,
+    calculate_pause_seconds,
+)
 from app.config import WEEKLY_HOURS
 
 
@@ -168,4 +180,56 @@ def get_statistics(db: Session) -> StatisticsResponse:
         this_week=week_summary,
         this_month=month_summary,
         recent_sessions=recent_sessions,
+    )
+
+
+def get_session_details(db: Session, session_id: int) -> SessionDetailResponse | None:
+    """Get detailed information about a specific session including all pauses"""
+    session = db.query(WorkSession).filter(WorkSession.id == session_id).first()
+
+    if not session:
+        return None
+
+    now = datetime.now()
+    net_seconds = session.net_seconds if session.net_seconds is not None else 0
+
+    # Calculate gross work time (elapsed time from start to end/now)
+    end_time = session.end_time or now
+    gross_seconds = int((end_time - session.start_time).total_seconds())
+
+    # Calculate total pause time
+    pause_seconds = calculate_pause_seconds(session, now)
+
+    overtime = calculate_overtime_seconds(net_seconds)
+
+    # Build pause period info list
+    pauses = []
+    for pause in session.pause_periods:
+        if pause.pause_end:
+            pause_duration = int((pause.pause_end - pause.pause_start).total_seconds())
+        else:
+            pause_duration = int((now - pause.pause_start).total_seconds())
+
+        pauses.append(
+            PausePeriodInfo(
+                id=pause.id,
+                pause_start=pause.pause_start.strftime("%H:%M"),
+                pause_end=pause.pause_end.strftime("%H:%M") if pause.pause_end else None,
+                duration_formatted=format_duration_short(pause_duration),
+            )
+        )
+
+    return SessionDetailResponse(
+        id=session.id,
+        date=session.date.strftime("%Y-%m-%d"),
+        start_time=session.start_time.strftime("%H:%M"),
+        end_time=session.end_time.strftime("%H:%M") if session.end_time else None,
+        net_work_formatted=format_duration_short(net_seconds),
+        gross_work_formatted=format_duration_short(gross_seconds),
+        total_pause_formatted=format_duration_short(pause_seconds),
+        overtime_seconds=overtime,
+        overtime_formatted=format_duration_short(overtime),
+        status=session.status,
+        pause_count=len(pauses),
+        pauses=pauses,
     )

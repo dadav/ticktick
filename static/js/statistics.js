@@ -148,3 +148,120 @@ function checkEmptyList() {
         sessionsList.innerHTML = '<p style="color: #888; text-align: center; padding: 1rem;">Noch keine abgeschlossenen Eintraege.</p>';
     }
 }
+
+
+// Modal functions for session details
+async function showSessionDetails(sessionId) {
+    const modal = document.getElementById('session-modal');
+    const modalBody = document.getElementById('modal-body');
+
+    // Show loading state
+    modalBody.innerHTML = '<p style="text-align: center; padding: 1rem;">Laden...</p>';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    try {
+        const response = await fetch(`/api/sessions/${sessionId}`);
+        if (!response.ok) {
+            throw new Error('Session nicht gefunden');
+        }
+        const session = await response.json();
+        modalBody.innerHTML = renderSessionDetails(session);
+    } catch (error) {
+        console.error('Fehler beim Laden der Session-Details:', error);
+        modalBody.innerHTML = '<p style="color: var(--color-danger); text-align: center; padding: 1rem;">Fehler beim Laden der Details.</p>';
+    }
+}
+
+
+function renderSessionDetails(session) {
+    const overtimeClass = session.overtime_seconds >= 0 ? 'positive' : 'negative';
+    const overtimeLabel = session.overtime_seconds >= 0 ? 'Ueberstunden' : 'Fehlstunden';
+
+    let html = `
+        <div class="detail-section">
+            <div class="detail-row">
+                <span class="label">Datum:</span>
+                <span class="value">${session.date}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Startzeit:</span>
+                <span class="value">${session.start_time}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Endzeit:</span>
+                <span class="value">${session.end_time || '--:--'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Bruttoarbeitszeit:</span>
+                <span class="value">${session.gross_work_formatted}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Pausenzeit (gesamt):</span>
+                <span class="value">${session.total_pause_formatted}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Nettoarbeitszeit:</span>
+                <span class="value">${session.net_work_formatted}</span>
+            </div>
+            <div class="detail-row ${overtimeClass}">
+                <span class="label">${overtimeLabel}:</span>
+                <span class="value">${session.overtime_formatted}</span>
+            </div>
+        </div>
+    `;
+
+    if (session.pauses && session.pauses.length > 0) {
+        html += `
+            <div class="detail-section">
+                <h4>Pausen (${session.pause_count})</h4>
+                <div class="pause-list">
+        `;
+
+        session.pauses.forEach((pause, index) => {
+            html += `
+                <div class="pause-item">
+                    <span class="pause-number">${index + 1}.</span>
+                    <span class="pause-times">${pause.pause_start} - ${pause.pause_end || '--:--'}</span>
+                    <span class="pause-duration">${pause.duration_formatted}</span>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="detail-section">
+                <h4>Pausen</h4>
+                <p style="color: var(--color-text-muted); font-size: 0.9rem;">Keine Pausen aufgezeichnet.</p>
+            </div>
+        `;
+    }
+
+    return html;
+}
+
+
+function closeModal() {
+    const modal = document.getElementById('session-modal');
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+
+function closeModalOnBackdrop(event) {
+    if (event.target.id === 'session-modal') {
+        closeModal();
+    }
+}
+
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
+});

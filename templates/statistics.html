@@ -67,20 +67,33 @@
     <h2>Letzte Eintr&auml;ge</h2>
     <div class="sessions-list">
         {% for session in stats.recent_sessions %}
-        <div class="session-item" data-session-id="{{ session.id }}">
+        <div class="session-item" data-session-id="{{ session.id }}" onclick="showSessionDetails({{ session.id }})">
             <span class="date">{{ session.date }}</span>
             <span class="times">{{ session.start_time }} - {{ session.end_time or '--:--' }}</span>
             <span class="duration">{{ session.net_work_formatted }}</span>
             <span class="overtime {% if session.overtime_seconds >= 0 %}positive{% else %}negative{% endif %}">{{ session.overtime_formatted }}</span>
-            <button class="btn-delete" onclick="deleteSession({{ session.id }})" title="Eintrag l&ouml;schen" aria-label="Eintrag l&ouml;schen">&#x2715;</button>
+            <button class="btn-delete" onclick="event.stopPropagation(); deleteSession({{ session.id }})" title="Eintrag l&ouml;schen" aria-label="Eintrag l&ouml;schen">&#x2715;</button>
         </div>
         {% else %}
         <p style="color: #888; text-align: center; padding: 1rem;">Noch keine abgeschlossenen Eintr&auml;ge.</p>
         {% endfor %}
     </div>
 </div>
+
+<!-- Session Details Modal -->
+<div id="session-modal" class="modal" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Session Details</h3>
+            <button class="modal-close" onclick="closeModal()" aria-label="Schliessen">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body">
+            <!-- Content loaded dynamically -->
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v={{ version }}"></script>
+<script src="/static/js/statistics.js?v={{ version }}" defer></script>
 {% endblock %}

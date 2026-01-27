@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import StatusResponse, ActionResponse, StatisticsResponse
+from app.schemas import StatusResponse, ActionResponse, StatisticsResponse, SessionDetailResponse
 from app.services import timer
 from app.services import statistics
+from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -49,6 +50,15 @@ def reset_timer(db: Session = Depends(get_db)):
 def get_statistics(db: Session = Depends(get_db)):
     """Get weekly/monthly statistics"""
     return statistics.get_statistics(db)
+
+
+@router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
+def get_session_details(session_id: int, db: Session = Depends(get_db)):
+    """Get detailed information about a specific session including pauses"""
+    result = statistics.get_session_details(db, session_id)
+    if result is None:
+        return JSONResponse(status_code=404, content={"detail": "Session not found"})
+    return result
 
 
 @router.delete("/sessions/{session_id}", response_model=ActionResponse)
