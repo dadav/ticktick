@@ -1,6 +1,6 @@
 [project]
 name = "ticktick"
-version = "0.4.2"
+version = "0.5.0"
 description = "Tracking worktime made easy."
 readme = "README.md"
 requires-python = ">=3.12"
