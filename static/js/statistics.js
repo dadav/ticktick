@@ -41,23 +41,7 @@ async function refreshStatistics() {
     // Update weekly statistics
     const weekTotal = document.getElementById("week-total");
     if (weekTotal) {
-      weekTotal.textContent = `${stats.this_week.total_formatted} / ${stats.this_week.target_formatted}`;
-    }
-
-    const weekProgress = document.getElementById("week-progress");
-    if (weekProgress) {
-      const progress =
-        stats.this_week.target_seconds > 0
-          ? (stats.this_week.total_seconds / stats.this_week.target_seconds) *
-            100
-          : 0;
-      weekProgress.style.width = `${Math.min(progress, 100)}%`;
-      weekProgress.classList.remove("overtime", "behind");
-      if (progress >= 100) {
-        weekProgress.classList.add("overtime");
-      } else if (progress < 80) {
-        weekProgress.classList.add("behind");
-      }
+      weekTotal.textContent = stats.this_week.total_formatted;
     }
 
     const weekDays = document.getElementById("week-days");
@@ -77,11 +61,10 @@ async function refreshStatistics() {
       weekOvertimeRow.classList.remove("positive", "negative");
       if (stats.this_week.overtime_seconds >= 0) {
         weekOvertimeRow.classList.add("positive");
-        weekOvertimeLabel.textContent = "Überstunden:";
       } else {
         weekOvertimeRow.classList.add("negative");
-        weekOvertimeLabel.textContent = "Fehlstunden:";
       }
+      weekOvertimeLabel.textContent = "Überstunden:";
       weekOvertime.textContent = stats.this_week.overtime_formatted;
     }
 
@@ -121,11 +104,10 @@ async function refreshStatistics() {
       monthOvertimeRow.classList.remove("positive", "negative");
       if (stats.this_month.overtime_seconds >= 0) {
         monthOvertimeRow.classList.add("positive");
-        monthOvertimeLabel.textContent = "Überstunden:";
       } else {
         monthOvertimeRow.classList.add("negative");
-        monthOvertimeLabel.textContent = "Fehlstunden:";
       }
+      monthOvertimeLabel.textContent = "Überstunden:";
       monthOvertime.textContent = stats.this_month.overtime_formatted;
     }
 
@@ -183,8 +165,7 @@ async function showSessionDetails(sessionId) {
 
 function renderSessionDetails(session) {
   const overtimeClass = session.overtime_seconds >= 0 ? "positive" : "negative";
-  const overtimeLabel =
-    session.overtime_seconds >= 0 ? "Überstunden" : "Fehlstunden";
+  const overtimeLabel = "Überstunden";
 
   let html = `
         <div class="detail-section">

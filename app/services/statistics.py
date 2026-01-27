@@ -112,9 +112,11 @@ def get_statistics(db: Session) -> StatisticsResponse:
 
     # Calculate week summary
     week_total_seconds = sum(s.net_seconds or 0 for s in week_sessions)
-    week_target_seconds = int(WEEKLY_HOURS * 3600)
     week_days_worked = len(set(s.date for s in week_sessions))
     week_avg_seconds = week_total_seconds // week_days_worked if week_days_worked > 0 else 0
+    # Calculate weekly target based on days worked (like monthly)
+    daily_requirement_seconds = int((WEEKLY_HOURS * 3600) / 5)
+    week_target_seconds = week_days_worked * daily_requirement_seconds
     week_overtime_seconds = week_total_seconds - week_target_seconds
     week_average_start, week_average_end = calculate_average_times(week_sessions)
 

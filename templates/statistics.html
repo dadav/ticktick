@@ -7,11 +7,7 @@
     <h2>Diese Woche</h2>
     <div class="stats-row">
         <span class="label">Gesamtstunden:</span>
-        <span class="value" id="week-total">{{ stats.this_week.total_formatted }} / {{ stats.this_week.target_formatted }}</span>
-    </div>
-    <div class="progress-bar">
-        {% set progress = (stats.this_week.total_seconds / stats.this_week.target_seconds * 100) if stats.this_week.target_seconds > 0 else 0 %}
-        <div class="fill {% if progress >= 100 %}overtime{% elif progress < 80 %}behind{% endif %}" id="week-progress" style="width: {{ [progress, 100] | min }}%"></div>
+        <span class="value" id="week-total">{{ stats.this_week.total_formatted }}</span>
     </div>
     <div class="stats-row">
         <span class="label">Arbeitstage:</span>
@@ -22,7 +18,7 @@
         <span class="value" id="week-avg">{{ stats.this_week.avg_per_day_formatted }}</span>
     </div>
     <div class="stats-row {% if stats.this_week.overtime_seconds >= 0 %}positive{% else %}negative{% endif %}" id="week-overtime-row">
-        <span class="label" id="week-overtime-label">{% if stats.this_week.overtime_seconds >= 0 %}Überstunden:{% else %}Fehlstunden:{% endif %}</span>
+        <span class="label" id="week-overtime-label">Überstunden:</span>
         <span class="value" id="week-overtime">{{ stats.this_week.overtime_formatted }}</span>
     </div>
     <div class="stats-row">
@@ -50,7 +46,7 @@
         <span class="value" id="month-avg">{{ stats.this_month.avg_per_day_formatted }}</span>
     </div>
     <div class="stats-row {% if stats.this_month.overtime_seconds >= 0 %}positive{% else %}negative{% endif %}" id="month-overtime-row">
-        <span class="label" id="month-overtime-label">{% if stats.this_month.overtime_seconds >= 0 %}Überstunden:{% else %}Fehlstunden:{% endif %}</span>
+        <span class="label" id="month-overtime-label">Überstunden:</span>
         <span class="value" id="month-overtime">{{ stats.this_month.overtime_formatted }}</span>
     </div>
     <div class="stats-row">
