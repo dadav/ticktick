@@ -19,7 +19,7 @@ A self-hosted work time tracking application built with Python and FastAPI.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ticktick.git
+git clone https://github.com/dadav/ticktick.git
 cd ticktick
 
 # Start the application
@@ -35,7 +35,7 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ticktick.git
+git clone https://github.com/dadav/ticktick.git
 cd ticktick
 
 # Install dependencies
@@ -55,29 +55,32 @@ cp .env.example .env
 
 ### Available Options
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TICKTICK_DB_PATH` | `./data/ticktick.db` | Path to SQLite database file |
-| `TICKTICK_WEEKLY_HOURS` | `41` | Required work hours per week |
-| `TICKTICK_MAX_DAILY_HOURS` | `10` | Maximum allowed work hours per day |
-| `TICKTICK_LUNCH_THRESHOLD` | `6` | Hours after which lunch break is deducted |
-| `TICKTICK_LUNCH_DURATION` | `30` | Lunch break duration in minutes |
-| `TICKTICK_HOST` | `0.0.0.0` | Server bind address |
-| `TICKTICK_PORT` | `8000` | Server port |
+| Variable                   | Default              | Description                               |
+| -------------------------- | -------------------- | ----------------------------------------- |
+| `TICKTICK_DB_PATH`         | `./data/ticktick.db` | Path to SQLite database file              |
+| `TICKTICK_WEEKLY_HOURS`    | `41`                 | Required work hours per week              |
+| `TICKTICK_MAX_DAILY_HOURS` | `10`                 | Maximum allowed work hours per day        |
+| `TICKTICK_LUNCH_THRESHOLD` | `6`                  | Hours after which lunch break is deducted |
+| `TICKTICK_LUNCH_DURATION`  | `30`                 | Lunch break duration in minutes           |
+| `TICKTICK_HOST`            | `0.0.0.0`            | Server bind address                       |
+| `TICKTICK_PORT`            | `8000`               | Server port                               |
 
 ### Examples
 
 **Standard 40-hour week:**
+
 ```bash
 TICKTICK_WEEKLY_HOURS=40
 ```
 
 **No lunch break deduction:**
+
 ```bash
 TICKTICK_LUNCH_THRESHOLD=24
 ```
 
 **Different port:**
+
 ```bash
 TICKTICK_PORT=3000
 ```
@@ -93,6 +96,7 @@ TICKTICK_PORT=3000
 5. **Reset**: Discard the current session without saving
 
 The page displays:
+
 - Current work time
 - Start time
 - Number of pauses and total pause duration
@@ -104,27 +108,29 @@ The page displays:
 ### Statistics Page
 
 View your work history including:
+
 - This week's total hours and progress toward weekly goal
 - This month's statistics
 - List of recent completed sessions
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/status` | Get current timer status |
-| `POST` | `/api/start` | Start a new session |
-| `POST` | `/api/pause` | Pause the current session |
-| `POST` | `/api/continue` | Resume from pause |
-| `POST` | `/api/stop` | Stop and save session |
-| `POST` | `/api/reset` | Discard current session |
-| `GET` | `/api/statistics/summary` | Get weekly/monthly stats |
+| Method | Endpoint                  | Description               |
+| ------ | ------------------------- | ------------------------- |
+| `GET`  | `/api/status`             | Get current timer status  |
+| `POST` | `/api/start`              | Start a new session       |
+| `POST` | `/api/pause`              | Pause the current session |
+| `POST` | `/api/continue`           | Resume from pause         |
+| `POST` | `/api/stop`               | Stop and save session     |
+| `POST` | `/api/reset`              | Discard current session   |
+| `GET`  | `/api/statistics/summary` | Get weekly/monthly stats  |
 
 ## Data Persistence
 
 All data is stored in a SQLite database. When using Docker, the database is persisted in the `./data` directory via a volume mount.
 
 To backup your data:
+
 ```bash
 cp ./data/ticktick.db ./ticktick-backup.db
 ```
