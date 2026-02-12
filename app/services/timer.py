@@ -84,7 +84,11 @@ def start_timer(db: Session) -> ActionResponse:
     state = get_or_create_timer_state(db)
 
     if state.current_session_id:
-        return ActionResponse(success=False, message="Timer already running", status="running")
+        return ActionResponse(
+            success=False,
+            message="Timer already running",
+            status="paused" if state.is_paused else "running",
+        )
 
     now = datetime.now()
     session = WorkSession(
@@ -96,9 +100,31 @@ def start_timer(db: Session) -> ActionResponse:
     db.commit()
     db.refresh(session)
 
-    state.current_session_id = session.id
-    state.is_running = True
-    state.is_paused = False
+    # Compare-and-set update prevents a race where concurrent starts could both
+    # create sessions and overwrite TimerState.current_session_id.
+    rows_updated = (
+        db.query(TimerState)
+        .filter(TimerState.id == 1, TimerState.current_session_id.is_(None))
+        .update(
+            {
+                TimerState.current_session_id: session.id,
+                TimerState.is_running: True,
+                TimerState.is_paused: False,
+            },
+            synchronize_session=False,
+        )
+    )
+
+    if rows_updated == 0:
+        db.delete(session)
+        db.commit()
+        current_state = get_or_create_timer_state(db)
+        return ActionResponse(
+            success=False,
+            message="Timer already running",
+            status="paused" if current_state.is_paused else "running",
+        )
+
     db.commit()
 
     return ActionResponse(success=True, message="Timer started", status="running")

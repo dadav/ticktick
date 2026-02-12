@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.models import WorkSession
 from app.schemas import (
@@ -87,6 +86,7 @@ def calculate_monthly_target_seconds(days_worked: int) -> int:
 def get_statistics(db: Session) -> StatisticsResponse:
     """Get comprehensive statistics"""
     now = datetime.now()
+    today = now.date()
     week_start = get_week_start(now).date()
     month_start = get_month_start(now).date()
 
@@ -96,6 +96,7 @@ def get_statistics(db: Session) -> StatisticsResponse:
         .filter(
             WorkSession.status == "completed",
             WorkSession.date >= week_start,
+            WorkSession.date <= today,
         )
         .all()
     )
@@ -106,6 +107,7 @@ def get_statistics(db: Session) -> StatisticsResponse:
         .filter(
             WorkSession.status == "completed",
             WorkSession.date >= month_start,
+            WorkSession.date <= today,
         )
         .all()
     )

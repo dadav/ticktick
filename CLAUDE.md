@@ -25,6 +25,12 @@ docker compose down
 
 Note: No test suite, linting, or type checking is currently configured.
 
+Backend regression checks are available via:
+
+```bash
+.venv/bin/python -m unittest -v tests/test_backend_fixes.py
+```
+
 ## Architecture
 
 ### Tech Stack
@@ -53,13 +59,14 @@ app/
 
 ### Data Flow
 
-1. Frontend (`static/js/timer.js`) polls `/api/status` every 500ms
+1. Frontend (`static/js/timer.js`) polls `/api/status` every 1000ms
 2. API layer (`app/routers/api.py`) handles timer controls and statistics
 3. Services layer performs business logic and calculations
 4. SQLite database persists sessions, pauses, and timer state
 
 ### Key Design Decisions
 - **Singleton timer state:** One `TimerState` record tracks current session/pause, persists across restarts
+- **Concurrent start protection:** `start_timer` uses a compare-and-set update on `TimerState.current_session_id` and discards losing session rows if two start requests race
 - **Pause audit trail:** Every break is stored as a `PausePeriod` linked to the session
 - **Automatic lunch deduction:** 30 min deducted after 6 hours of gross work time
 
@@ -84,7 +91,7 @@ All settings via environment variables (prefix `TICKTICK_`):
 | POST | `/api/reset` | Discard current session |
 | GET | `/api/statistics/summary` | Weekly/monthly stats |
 | GET | `/api/sessions/{id}` | Get session details with pause periods |
-| DELETE | `/api/sessions/{id}` | Delete a completed session by ID |
+| DELETE | `/api/sessions/{id}` | Delete a non-active session by ID (current active session is blocked) |
 
 ## CI/CD
 
