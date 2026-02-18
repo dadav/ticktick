@@ -31,6 +31,13 @@ Backend regression checks are available via:
 .venv/bin/python -m unittest -v tests/test_backend_fixes.py
 ```
 
+Current regression coverage includes:
+- active start race handling in `start_timer`
+- statistics excluding future completed sessions
+- session details 404 behavior
+- live net/overtime values for active session details
+- delete response status consistency while timer remains active
+
 ## Architecture
 
 ### Tech Stack

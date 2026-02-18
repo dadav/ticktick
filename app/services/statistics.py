@@ -15,6 +15,7 @@ from app.services.calculations import (
     format_duration_short,
     calculate_overtime_seconds,
     calculate_pause_seconds,
+    calculate_net_work_seconds,
 )
 from app.config import WEEKLY_HOURS
 
@@ -29,7 +30,9 @@ def get_month_start(date: datetime) -> datetime:
     return date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
-def calculate_average_times(sessions: list[WorkSession]) -> tuple[str | None, str | None]:
+def calculate_average_times(
+    sessions: list[WorkSession],
+) -> tuple[str | None, str | None]:
     """
     Calculate average start and end times from a list of sessions.
 
@@ -45,7 +48,9 @@ def calculate_average_times(sessions: list[WorkSession]) -> tuple[str | None, st
     for session in sessions:
         if session.start_time:
             start = session.start_time
-            seconds_since_midnight = start.hour * 3600 + start.minute * 60 + start.second
+            seconds_since_midnight = (
+                start.hour * 3600 + start.minute * 60 + start.second
+            )
             start_times_seconds.append(seconds_since_midnight)
 
     average_start = None
@@ -115,7 +120,9 @@ def get_statistics(db: Session) -> StatisticsResponse:
     # Calculate week summary
     week_total_seconds = sum(s.net_seconds or 0 for s in week_sessions)
     week_days_worked = len(set(s.date for s in week_sessions))
-    week_avg_seconds = week_total_seconds // week_days_worked if week_days_worked > 0 else 0
+    week_avg_seconds = (
+        week_total_seconds // week_days_worked if week_days_worked > 0 else 0
+    )
     # Calculate weekly target based on days worked (like monthly)
     daily_requirement_seconds = int((WEEKLY_HOURS * 3600) / 5)
     week_target_seconds = week_days_worked * daily_requirement_seconds
@@ -138,7 +145,9 @@ def get_statistics(db: Session) -> StatisticsResponse:
     # Calculate month summary
     month_total_seconds = sum(s.net_seconds or 0 for s in month_sessions)
     month_days_worked = len(set(s.date for s in month_sessions))
-    month_avg_seconds = month_total_seconds // month_days_worked if month_days_worked > 0 else 0
+    month_avg_seconds = (
+        month_total_seconds // month_days_worked if month_days_worked > 0 else 0
+    )
     month_target_seconds = calculate_monthly_target_seconds(month_days_worked)
     month_overtime_seconds = month_total_seconds - month_target_seconds
     month_average_start, month_average_end = calculate_average_times(month_sessions)
@@ -195,7 +204,10 @@ def get_session_details(db: Session, session_id: int) -> SessionDetailResponse |
         return None
 
     now = datetime.now()
-    net_seconds = session.net_seconds if session.net_seconds is not None else 0
+    if session.net_seconds is not None:
+        net_seconds = session.net_seconds
+    else:
+        net_seconds = calculate_net_work_seconds(session, now)
 
     # Calculate gross work time (elapsed time from start to end/now)
     end_time = session.end_time or now
@@ -218,7 +230,9 @@ def get_session_details(db: Session, session_id: int) -> SessionDetailResponse |
             PausePeriodInfo(
                 id=pause.id,
                 pause_start=pause.pause_start.strftime("%H:%M"),
-                pause_end=pause.pause_end.strftime("%H:%M") if pause.pause_end else None,
+                pause_end=pause.pause_end.strftime("%H:%M")
+                if pause.pause_end
+                else None,
                 duration_formatted=format_duration_short(pause_duration),
             )
         )

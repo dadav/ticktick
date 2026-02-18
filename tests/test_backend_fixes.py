@@ -22,7 +22,9 @@ class BackendFixesTestCase(unittest.TestCase):
             f"sqlite:///{self.db_path}",
             connect_args={"check_same_thread": False},
         )
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine
+        )
         Base.metadata.create_all(bind=self.engine)
         self.db = self.SessionLocal()
 
@@ -32,7 +34,9 @@ class BackendFixesTestCase(unittest.TestCase):
         self.tmp_dir.cleanup()
 
     def test_start_timer_race_discards_losing_session(self) -> None:
-        state = TimerState(id=1, is_running=False, is_paused=False, current_session_id=None)
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
         self.db.add(state)
         self.db.commit()
 
@@ -78,6 +82,49 @@ class BackendFixesTestCase(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 404)
         self.assertEqual(context.exception.detail, "Session not found")
+
+    def test_session_details_use_live_time_for_active_session(self) -> None:
+        base_now = datetime(2026, 2, 18, 10, 0, 0)
+
+        with patch("app.services.timer.datetime") as timer_datetime:
+            timer_datetime.now.return_value = base_now
+            result = timer.start_timer(self.db)
+
+        self.assertTrue(result.success)
+        active_session = timer.get_active_session(self.db)
+        self.assertIsNotNone(active_session)
+
+        with patch("app.services.statistics.datetime") as statistics_datetime:
+            statistics_datetime.now.return_value = base_now + timedelta(
+                hours=1, minutes=5
+            )
+            details = statistics.get_session_details(self.db, active_session.id)
+
+        self.assertIsNotNone(details)
+        self.assertEqual(details.net_work_formatted, "01:05")
+        self.assertEqual(details.gross_work_formatted, "01:05")
+        self.assertEqual(details.overtime_formatted, "-07:07")
+
+    def test_delete_session_returns_running_status_when_timer_active(self) -> None:
+        start_result = timer.start_timer(self.db)
+        self.assertTrue(start_result.success)
+
+        now = datetime.now().replace(second=0, microsecond=0)
+        completed_session = WorkSession(
+            date=now.date(),
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            net_seconds=3600,
+            status="completed",
+        )
+        self.db.add(completed_session)
+        self.db.commit()
+        self.db.refresh(completed_session)
+
+        delete_result = timer.delete_session(self.db, completed_session.id)
+
+        self.assertTrue(delete_result.success)
+        self.assertEqual(delete_result.status, "running")
 
 
 if __name__ == "__main__":

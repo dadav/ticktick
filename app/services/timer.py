@@ -33,7 +33,11 @@ def get_active_session(db: Session) -> WorkSession | None:
     """Get the current active session if any"""
     state = get_or_create_timer_state(db)
     if state.current_session_id:
-        return db.query(WorkSession).filter(WorkSession.id == state.current_session_id).first()
+        return (
+            db.query(WorkSession)
+            .filter(WorkSession.id == state.current_session_id)
+            .first()
+        )
     return None
 
 
@@ -67,16 +71,30 @@ def get_status(db: Session) -> StatusResponse:
 
     calculations = Calculations(
         lunch_break_applies=lunch_applies,
-        lunch_break_at=format_time(calculate_lunch_break_time(session.start_time, pause_minutes)) if not lunch_applies else None,
-        earliest_leave=format_time(calculate_earliest_leave(session.start_time, pause_minutes)),
-        normal_leave=format_time(calculate_normal_leave(session.start_time, pause_minutes)),
-        latest_leave=format_time(calculate_latest_leave(session.start_time, pause_minutes)),
-        remaining_for_daily=format_duration(calculate_remaining_for_daily(net_work_seconds)),
+        lunch_break_at=format_time(
+            calculate_lunch_break_time(session.start_time, pause_minutes)
+        )
+        if not lunch_applies
+        else None,
+        earliest_leave=format_time(
+            calculate_earliest_leave(session.start_time, pause_minutes)
+        ),
+        normal_leave=format_time(
+            calculate_normal_leave(session.start_time, pause_minutes)
+        ),
+        latest_leave=format_time(
+            calculate_latest_leave(session.start_time, pause_minutes)
+        ),
+        remaining_for_daily=format_duration(
+            calculate_remaining_for_daily(net_work_seconds)
+        ),
         overtime_seconds=overtime_seconds,
         overtime_formatted=format_duration(overtime_seconds),
     )
 
-    return StatusResponse(status=status, session=session_info, calculations=calculations)
+    return StatusResponse(
+        status=status, session=session_info, calculations=calculations
+    )
 
 
 def start_timer(db: Session) -> ActionResponse:
@@ -139,7 +157,9 @@ def pause_timer(db: Session) -> ActionResponse:
         return ActionResponse(success=False, message="No active session", status="idle")
 
     if state.is_paused:
-        return ActionResponse(success=False, message="Timer already paused", status="paused")
+        return ActionResponse(
+            success=False, message="Timer already paused", status="paused"
+        )
 
     now = datetime.now()
     pause = PausePeriod(session_id=session.id, pause_start=now)
@@ -161,7 +181,9 @@ def continue_timer(db: Session) -> ActionResponse:
         return ActionResponse(success=False, message="No active session", status="idle")
 
     if not state.is_paused:
-        return ActionResponse(success=False, message="Timer not paused", status="running")
+        return ActionResponse(
+            success=False, message="Timer not paused", status="running"
+        )
 
     # Find the active pause and end it
     active_pause = (
@@ -210,7 +232,9 @@ def stop_timer(db: Session) -> ActionResponse:
     state.is_paused = False
     db.commit()
 
-    return ActionResponse(success=True, message="Timer stopped and saved", status="idle")
+    return ActionResponse(
+        success=True, message="Timer stopped and saved", status="idle"
+    )
 
 
 def reset_timer(db: Session) -> ActionResponse:
@@ -231,28 +255,41 @@ def reset_timer(db: Session) -> ActionResponse:
     state.is_paused = False
     db.commit()
 
-    return ActionResponse(success=True, message="Timer reset (session discarded)", status="idle")
+    return ActionResponse(
+        success=True, message="Timer reset (session discarded)", status="idle"
+    )
 
 
 def delete_session(db: Session, session_id: int) -> ActionResponse:
     """Delete a completed work session by ID"""
     state = get_or_create_timer_state(db)
+    current_status = (
+        "paused"
+        if state.is_paused
+        else "running"
+        if state.current_session_id
+        else "idle"
+    )
 
     # Cannot delete the currently active session
     if state.current_session_id == session_id:
         return ActionResponse(
             success=False,
             message="Cannot delete the currently active session",
-            status="running" if state.is_running else "paused"
+            status=current_status,
         )
 
     session = db.query(WorkSession).filter(WorkSession.id == session_id).first()
 
     if not session:
-        return ActionResponse(success=False, message="Session not found", status="idle")
+        return ActionResponse(
+            success=False, message="Session not found", status=current_status
+        )
 
     # Delete the session (cascade will delete related pause periods)
     db.delete(session)
     db.commit()
 
-    return ActionResponse(success=True, message="Session deleted", status="idle")
+    return ActionResponse(
+        success=True, message="Session deleted", status=current_status
+    )
