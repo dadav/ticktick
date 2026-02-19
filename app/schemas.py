@@ -27,6 +27,7 @@ class StatusResponse(BaseModel):
     status: str  # "idle", "running", "paused"
     session: SessionInfo | None
     calculations: Calculations | None
+    auto_stopped: bool = False
 
 
 class ActionResponse(BaseModel):
@@ -81,6 +82,11 @@ class PausePeriodInfo(BaseModel):
     pause_start: str  # HH:MM format
     pause_end: str | None  # HH:MM format, None if pause is still active
     duration_formatted: str  # Duration as formatted string
+
+
+class SessionUpdateRequest(BaseModel):
+    start_time: str | None = None  # HH:MM format
+    end_time: str | None = None    # HH:MM format
 
 
 class SessionDetailResponse(BaseModel):

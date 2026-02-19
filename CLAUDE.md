@@ -37,6 +37,13 @@ Current regression coverage includes:
 - session details 404 behavior
 - live net/overtime values for active session details
 - delete response status consistency while timer remains active
+- auto-stop when net work reaches MAX_DAILY_HOURS
+- net work seconds capped at MAX_DAILY_SECONDS
+- session update (end_time change + net_seconds recalculation)
+- session update blocked for active sessions
+- session update validates start < end
+- session update validates against pause boundaries
+- session update returns 404 for missing sessions
 
 ## Architecture
 
@@ -98,6 +105,7 @@ All settings via environment variables (prefix `TICKTICK_`):
 | POST | `/api/reset` | Discard current session |
 | GET | `/api/statistics/summary` | Weekly/monthly stats |
 | GET | `/api/sessions/{id}` | Get session details with pause periods |
+| PUT | `/api/sessions/{id}` | Update start/end time of a completed session |
 | DELETE | `/api/sessions/{id}` | Delete a non-active session by ID (current active session is blocked) |
 
 ## CI/CD

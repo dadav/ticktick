@@ -86,6 +86,9 @@ async function fetchStatus() {
     try {
         const response = await fetch('/api/status');
         const data = await response.json();
+        if (data.auto_stopped) {
+            alert('Maximale tägliche Arbeitszeit (10 Stunden) erreicht. Timer wurde automatisch gestoppt.');
+        }
         updateUI(data);
     } catch (error) {
         console.error('Fehler beim Abrufen des Status:', error);

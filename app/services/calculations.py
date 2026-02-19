@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from app.config import (
     DAILY_REQUIREMENT_MINUTES,
     MAX_DAILY_HOURS,
+    MAX_DAILY_SECONDS,
     LUNCH_THRESHOLD_HOURS,
     LUNCH_DURATION_MINUTES,
 )
@@ -56,7 +57,8 @@ def calculate_net_work_seconds(session: WorkSession, now: datetime | None = None
         elapsed = (now - session.start_time).total_seconds()
 
     pause_seconds = calculate_pause_seconds(session, now)
-    return max(0, int(elapsed - pause_seconds))
+    net = max(0, int(elapsed - pause_seconds))
+    return min(net, MAX_DAILY_SECONDS)
 
 
 def calculate_lunch_break_minutes(work_minutes: float) -> int:

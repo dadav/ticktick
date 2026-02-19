@@ -15,7 +15,7 @@ from app.services.calculations import (
     format_duration,
     format_time,
 )
-from app.config import LUNCH_THRESHOLD_HOURS
+from app.config import LUNCH_THRESHOLD_HOURS, MAX_DAILY_SECONDS
 
 
 def get_or_create_timer_state(db: Session) -> TimerState:
@@ -50,8 +50,19 @@ def get_status(db: Session) -> StatusResponse:
     if not session:
         return StatusResponse(status="idle", session=None, calculations=None)
 
-    status = "paused" if state.is_paused else "running"
     net_work_seconds = calculate_net_work_seconds(session, now)
+
+    # Auto-stop when net work reaches the daily maximum
+    if net_work_seconds >= MAX_DAILY_SECONDS:
+        _auto_stop_session(db, session, state, now)
+        return StatusResponse(
+            status="idle",
+            session=None,
+            calculations=None,
+            auto_stopped=True,
+        )
+
+    status = "paused" if state.is_paused else "running"
     pause_seconds = calculate_pause_seconds(session, now)
     pause_minutes = pause_seconds // 60
 
@@ -293,3 +304,117 @@ def delete_session(db: Session, session_id: int) -> ActionResponse:
     return ActionResponse(
         success=True, message="Session deleted", status=current_status
     )
+
+
+def update_session(
+    db: Session, session_id: int, start_time: str | None, end_time: str | None
+) -> ActionResponse:
+    """Update start_time and/or end_time of a completed session, recalculating net_seconds."""
+    state = get_or_create_timer_state(db)
+    current_status = (
+        "paused"
+        if state.is_paused
+        else "running"
+        if state.current_session_id
+        else "idle"
+    )
+
+    # Block editing the active session
+    if state.current_session_id == session_id:
+        return ActionResponse(
+            success=False,
+            message="Cannot edit the currently active session",
+            status=current_status,
+        )
+
+    session = db.query(WorkSession).filter(WorkSession.id == session_id).first()
+    if not session:
+        return ActionResponse(
+            success=False, message="Session not found", status=current_status
+        )
+
+    if not start_time and not end_time:
+        return ActionResponse(
+            success=False, message="No changes provided", status=current_status
+        )
+
+    session_date = session.start_time.date()
+
+    # Parse and apply new start_time
+    new_start = session.start_time
+    if start_time:
+        try:
+            h, m = map(int, start_time.split(":"))
+            new_start = datetime(session_date.year, session_date.month, session_date.day, h, m)
+        except (ValueError, AttributeError):
+            return ActionResponse(
+                success=False, message="Invalid start_time format (expected HH:MM)", status=current_status
+            )
+
+    # Parse and apply new end_time
+    new_end = session.end_time
+    if end_time:
+        try:
+            h, m = map(int, end_time.split(":"))
+            new_end = datetime(session_date.year, session_date.month, session_date.day, h, m)
+        except (ValueError, AttributeError):
+            return ActionResponse(
+                success=False, message="Invalid end_time format (expected HH:MM)", status=current_status
+            )
+
+    # Validate: start < end
+    if new_end and new_start >= new_end:
+        return ActionResponse(
+            success=False, message="Start time must be before end time", status=current_status
+        )
+
+    # Validate against pause periods
+    pauses = sorted(session.pause_periods, key=lambda p: p.pause_start)
+    if pauses:
+        first_pause_start = pauses[0].pause_start
+        last_pause_end = pauses[-1].pause_end
+        if new_start > first_pause_start:
+            return ActionResponse(
+                success=False,
+                message="Start time must be before the first pause",
+                status=current_status,
+            )
+        if last_pause_end and new_end and new_end < last_pause_end:
+            return ActionResponse(
+                success=False,
+                message="End time must be after the last pause",
+                status=current_status,
+            )
+
+    session.start_time = new_start
+    if new_end:
+        session.end_time = new_end
+    session.net_seconds = calculate_net_work_seconds(session, session.end_time)
+    db.commit()
+
+    return ActionResponse(
+        success=True, message="Session updated", status=current_status
+    )
+
+
+def _auto_stop_session(
+    db: Session, session: WorkSession, state: TimerState, now: datetime
+) -> None:
+    """Auto-stop a session that has reached the daily maximum work time."""
+    # End any active pause
+    active_pause = (
+        db.query(PausePeriod)
+        .filter(PausePeriod.session_id == session.id, PausePeriod.pause_end.is_(None))
+        .first()
+    )
+    if active_pause:
+        active_pause.pause_end = now
+
+    session.end_time = now
+    session.net_seconds = MAX_DAILY_SECONDS
+    session.status = "completed"
+
+    state.current_session_id = None
+    state.is_running = False
+    state.is_paused = False
+    db.commit()

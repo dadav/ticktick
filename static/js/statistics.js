@@ -166,6 +166,7 @@ async function showSessionDetails(sessionId) {
 function renderSessionDetails(session) {
   const overtimeClass = session.overtime_seconds >= 0 ? "positive" : "negative";
   const overtimeLabel = "Überstunden";
+  const isCompleted = session.status === "completed";
 
   let html = `
         <div class="detail-section">
@@ -175,11 +176,11 @@ function renderSessionDetails(session) {
             </div>
             <div class="detail-row">
                 <span class="label">Startzeit:</span>
-                <span class="value">${session.start_time}</span>
+                <span class="value" id="detail-start-time">${session.start_time}</span>
             </div>
             <div class="detail-row">
                 <span class="label">Endzeit:</span>
-                <span class="value">${session.end_time || "--:--"}</span>
+                <span class="value" id="detail-end-time">${session.end_time || "--:--"}</span>
             </div>
             <div class="detail-row">
                 <span class="label">Bruttoarbeitszeit:</span>
@@ -197,8 +198,18 @@ function renderSessionDetails(session) {
                 <span class="label">${overtimeLabel}:</span>
                 <span class="value">${session.overtime_formatted}</span>
             </div>
-        </div>
     `;
+
+  if (isCompleted) {
+    html += `
+            <div class="detail-row" style="margin-top: 0.5rem;">
+                <span></span>
+                <button class="btn-edit" onclick="editSession(${session.id}, '${session.start_time}', '${session.end_time || ""}')">&#9998; Bearbeiten</button>
+            </div>
+    `;
+  }
+
+  html += `</div>`;
 
   if (session.pauses && session.pauses.length > 0) {
     html += `
@@ -231,6 +242,57 @@ function renderSessionDetails(session) {
   }
 
   return html;
+}
+
+function editSession(sessionId, currentStart, currentEnd) {
+  const startEl = document.getElementById("detail-start-time");
+  const endEl = document.getElementById("detail-end-time");
+
+  startEl.innerHTML = `<input type="text" id="edit-start-time" value="${currentStart}" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="HH:MM" maxlength="5" />`;
+  endEl.innerHTML = `<input type="text" id="edit-end-time" value="${currentEnd}" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="HH:MM" maxlength="5" />`;
+
+  // Replace edit button with save/cancel
+  const editRow = startEl.closest(".detail-section").querySelector(".detail-row:last-child");
+  editRow.innerHTML = `
+    <span></span>
+    <span class="edit-actions">
+      <button class="btn-edit btn-save" onclick="saveSessionEdit(${sessionId})">Speichern</button>
+      <button class="btn-edit btn-cancel" onclick="cancelEdit(${sessionId})">Abbrechen</button>
+    </span>
+  `;
+}
+
+async function saveSessionEdit(sessionId) {
+  const startInput = document.getElementById("edit-start-time");
+  const endInput = document.getElementById("edit-end-time");
+
+  const body = {};
+  if (startInput && startInput.value) body.start_time = startInput.value;
+  if (endInput && endInput.value) body.end_time = endInput.value;
+
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+
+    if (data.success) {
+      // Re-fetch and re-render the details
+      await showSessionDetails(sessionId);
+      await refreshStatistics();
+    } else {
+      alert("Fehler: " + data.message);
+    }
+  } catch (error) {
+    console.error("Fehler beim Speichern:", error);
+    alert("Fehler beim Speichern der Aenderungen.");
+  }
+}
+
+async function cancelEdit(sessionId) {
+  await showSessionDetails(sessionId);
 }
 
 function closeModal() {

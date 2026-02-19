@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import StatusResponse, ActionResponse, StatisticsResponse, SessionDetailResponse
+from app.schemas import StatusResponse, ActionResponse, StatisticsResponse, SessionDetailResponse, SessionUpdateRequest
 from app.services import timer
 from app.services import statistics
 
@@ -58,6 +58,12 @@ def get_session_details(session_id: int, db: Session = Depends(get_db)):
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return result
+
+
+@router.put("/sessions/{session_id}", response_model=ActionResponse)
+def update_session(session_id: int, body: SessionUpdateRequest, db: Session = Depends(get_db)):
+    """Update start/end time of a completed session"""
+    return timer.update_session(db, session_id, body.start_time, body.end_time)
 
 
 @router.delete("/sessions/{session_id}", response_model=ActionResponse)
