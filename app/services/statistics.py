@@ -17,7 +17,7 @@ from app.services.calculations import (
     calculate_pause_seconds,
     calculate_net_work_seconds,
 )
-from app.config import WEEKLY_HOURS
+from app.config import WEEKLY_HOURS, LUNCH_THRESHOLD_HOURS, LUNCH_DURATION_MINUTES
 
 
 def get_week_start(date: datetime) -> datetime:
@@ -119,19 +119,25 @@ def get_statistics(db: Session) -> StatisticsResponse:
 
     # Calculate week summary
     week_total_seconds = sum(s.net_seconds or 0 for s in week_sessions)
+    week_lunch_seconds = sum(
+        LUNCH_DURATION_MINUTES * 60
+        for s in week_sessions
+        if (s.net_seconds or 0) > LUNCH_THRESHOLD_HOURS * 3600
+    )
+    week_effective_seconds = week_total_seconds - week_lunch_seconds
     week_days_worked = len(set(s.date for s in week_sessions))
     week_avg_seconds = (
-        week_total_seconds // week_days_worked if week_days_worked > 0 else 0
+        week_effective_seconds // week_days_worked if week_days_worked > 0 else 0
     )
     # Calculate weekly target based on days worked (like monthly)
     daily_requirement_seconds = int((WEEKLY_HOURS * 3600) / 5)
     week_target_seconds = week_days_worked * daily_requirement_seconds
-    week_overtime_seconds = week_total_seconds - week_target_seconds
+    week_overtime_seconds = week_effective_seconds - week_target_seconds
     week_average_start, week_average_end = calculate_average_times(week_sessions)
 
     week_summary = WeekSummary(
-        total_seconds=week_total_seconds,
-        total_formatted=format_duration(week_total_seconds),
+        total_seconds=week_effective_seconds,
+        total_formatted=format_duration(week_effective_seconds),
         target_seconds=week_target_seconds,
         target_formatted=format_duration(week_target_seconds),
         days_worked=week_days_worked,
@@ -144,17 +150,23 @@ def get_statistics(db: Session) -> StatisticsResponse:
 
     # Calculate month summary
     month_total_seconds = sum(s.net_seconds or 0 for s in month_sessions)
+    month_lunch_seconds = sum(
+        LUNCH_DURATION_MINUTES * 60
+        for s in month_sessions
+        if (s.net_seconds or 0) > LUNCH_THRESHOLD_HOURS * 3600
+    )
+    month_effective_seconds = month_total_seconds - month_lunch_seconds
     month_days_worked = len(set(s.date for s in month_sessions))
     month_avg_seconds = (
-        month_total_seconds // month_days_worked if month_days_worked > 0 else 0
+        month_effective_seconds // month_days_worked if month_days_worked > 0 else 0
     )
     month_target_seconds = calculate_monthly_target_seconds(month_days_worked)
-    month_overtime_seconds = month_total_seconds - month_target_seconds
+    month_overtime_seconds = month_effective_seconds - month_target_seconds
     month_average_start, month_average_end = calculate_average_times(month_sessions)
 
     month_summary = MonthSummary(
-        total_seconds=month_total_seconds,
-        total_formatted=format_duration(month_total_seconds),
+        total_seconds=month_effective_seconds,
+        total_formatted=format_duration(month_effective_seconds),
         days_worked=month_days_worked,
         avg_per_day_formatted=format_duration(month_avg_seconds),
         overtime_seconds=month_overtime_seconds,
@@ -175,7 +187,8 @@ def get_statistics(db: Session) -> StatisticsResponse:
     recent_sessions = []
     for s in recent:
         net_seconds = s.net_seconds or 0
-        overtime = calculate_overtime_seconds(net_seconds)
+        lunch_applies = net_seconds > LUNCH_THRESHOLD_HOURS * 3600
+        overtime = calculate_overtime_seconds(net_seconds, lunch_applies)
         recent_sessions.append(
             SessionSummary(
                 id=s.id,
@@ -216,7 +229,8 @@ def get_session_details(db: Session, session_id: int) -> SessionDetailResponse |
     # Calculate total pause time
     pause_seconds = calculate_pause_seconds(session, now)
 
-    overtime = calculate_overtime_seconds(net_seconds)
+    lunch_applies = net_seconds > LUNCH_THRESHOLD_HOURS * 3600
+    overtime = calculate_overtime_seconds(net_seconds, lunch_applies)
 
     # Build pause period info list
     pauses = []

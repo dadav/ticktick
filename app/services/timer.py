@@ -78,7 +78,7 @@ def get_status(db: Session) -> StatusResponse:
 
     net_work_minutes = net_work_seconds / 60
     lunch_applies = net_work_minutes > LUNCH_THRESHOLD_HOURS * 60
-    overtime_seconds = calculate_overtime_seconds(net_work_seconds)
+    overtime_seconds = calculate_overtime_seconds(net_work_seconds, lunch_applies)
 
     calculations = Calculations(
         lunch_break_applies=lunch_applies,
@@ -97,7 +97,7 @@ def get_status(db: Session) -> StatusResponse:
             calculate_latest_leave(session.start_time, pause_minutes)
         ),
         remaining_for_daily=format_duration(
-            calculate_remaining_for_daily(net_work_seconds)
+            calculate_remaining_for_daily(net_work_seconds, lunch_applies)
         ),
         overtime_seconds=overtime_seconds,
         overtime_formatted=format_duration(overtime_seconds),

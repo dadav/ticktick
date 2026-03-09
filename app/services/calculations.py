@@ -107,13 +107,23 @@ def calculate_lunch_break_time(start_time: datetime, pause_minutes: int) -> date
     return start_time + timedelta(minutes=threshold_minutes)
 
 
-def calculate_remaining_for_daily(net_work_seconds: int) -> int:
-    """Calculate seconds remaining to reach daily requirement"""
+def calculate_remaining_for_daily(net_work_seconds: int, lunch_applies: bool) -> int:
+    """Calculate seconds remaining to reach daily requirement.
+    When lunch applies, the mandatory lunch break is added to the target
+    so that remaining reaches 0 at the same time as normal_leave.
+    """
     target_seconds = int(DAILY_REQUIREMENT_MINUTES * 60)
+    if lunch_applies:
+        target_seconds += LUNCH_DURATION_MINUTES * 60
     return max(0, target_seconds - net_work_seconds)
 
 
-def calculate_overtime_seconds(net_work_seconds: int) -> int:
-    """Calculate overtime (positive) or undertime (negative) for the day"""
+def calculate_overtime_seconds(net_work_seconds: int, lunch_applies: bool) -> int:
+    """Calculate overtime (positive) or undertime (negative) for the day.
+    When lunch applies, the mandatory lunch break is added to the target
+    so that overtime reaches 0 at the same time as normal_leave.
+    """
     target_seconds = int(DAILY_REQUIREMENT_MINUTES * 60)
+    if lunch_applies:
+        target_seconds += LUNCH_DURATION_MINUTES * 60
     return net_work_seconds - target_seconds
