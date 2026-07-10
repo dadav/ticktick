@@ -124,3 +124,5 @@ Docker also honors `TZ` (default `Europe/Berlin`); without it the container comp
 ## CI/CD
 
 GitHub Actions workflow (`.github/workflows/publish.yml`) builds and pushes Docker images to `ghcr.io/dadav/ticktick` on tag push or release.
+
+Cut a release with `just release 0.8.0`: it runs the tests, bumps the version in `pyproject.toml` and `uv.lock`, commits as `chore: version bump`, and creates the `v0.8.0` tag. The tag is not pushed automatically; `git push && git push origin v0.8.0` triggers the publish workflow.
