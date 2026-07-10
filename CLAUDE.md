@@ -9,6 +9,8 @@ TickTick is a self-hosted work time tracking application built with Python and F
 ## Commands
 
 ```bash
+# All common commands are available via just (run `just` to list them)
+
 # Install dependencies
 uv sync
 
