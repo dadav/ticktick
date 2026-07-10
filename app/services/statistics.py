@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.models import WorkSession
@@ -79,13 +79,32 @@ def calculate_average_times(
     return average_start, average_end
 
 
-def calculate_monthly_target_seconds(days_worked: int) -> int:
+def summarize_sessions(sessions: list[WorkSession]) -> tuple[int, int, int]:
     """
-    Calculate monthly target based on days worked.
-    Uses daily requirement derived from weekly hours.
+    Group sessions by date and summarize them.
+
+    Returns (effective_seconds, days_worked, target_seconds).
+    Lunch is deducted once per day when the day's summed net work exceeds the
+    threshold, so several short sessions on one day behave like one long session.
     """
+    daily_net: dict[date, int] = {}
+    for session in sessions:
+        daily_net[session.date] = daily_net.get(session.date, 0) + (
+            session.net_seconds or 0
+        )
+
+    lunch_seconds = LUNCH_DURATION_MINUTES * 60
+    threshold_seconds = LUNCH_THRESHOLD_HOURS * 3600
+    effective_seconds = sum(
+        net - lunch_seconds if net > threshold_seconds else net
+        for net in daily_net.values()
+    )
+
+    days_worked = len(daily_net)
     daily_requirement_seconds = int((WEEKLY_HOURS * 3600) / 5)  # 5 workdays per week
-    return days_worked * daily_requirement_seconds
+    target_seconds = days_worked * daily_requirement_seconds
+
+    return effective_seconds, days_worked, target_seconds
 
 
 def get_statistics(db: Session) -> StatisticsResponse:
@@ -118,20 +137,12 @@ def get_statistics(db: Session) -> StatisticsResponse:
     )
 
     # Calculate week summary
-    week_total_seconds = sum(s.net_seconds or 0 for s in week_sessions)
-    week_lunch_seconds = sum(
-        LUNCH_DURATION_MINUTES * 60
-        for s in week_sessions
-        if (s.net_seconds or 0) > LUNCH_THRESHOLD_HOURS * 3600
+    week_effective_seconds, week_days_worked, week_target_seconds = summarize_sessions(
+        week_sessions
     )
-    week_effective_seconds = week_total_seconds - week_lunch_seconds
-    week_days_worked = len(set(s.date for s in week_sessions))
     week_avg_seconds = (
         week_effective_seconds // week_days_worked if week_days_worked > 0 else 0
     )
-    # Calculate weekly target based on days worked (like monthly)
-    daily_requirement_seconds = int((WEEKLY_HOURS * 3600) / 5)
-    week_target_seconds = week_days_worked * daily_requirement_seconds
     week_overtime_seconds = week_effective_seconds - week_target_seconds
     week_average_start, week_average_end = calculate_average_times(week_sessions)
 
@@ -149,18 +160,14 @@ def get_statistics(db: Session) -> StatisticsResponse:
     )
 
     # Calculate month summary
-    month_total_seconds = sum(s.net_seconds or 0 for s in month_sessions)
-    month_lunch_seconds = sum(
-        LUNCH_DURATION_MINUTES * 60
-        for s in month_sessions
-        if (s.net_seconds or 0) > LUNCH_THRESHOLD_HOURS * 3600
-    )
-    month_effective_seconds = month_total_seconds - month_lunch_seconds
-    month_days_worked = len(set(s.date for s in month_sessions))
+    (
+        month_effective_seconds,
+        month_days_worked,
+        month_target_seconds,
+    ) = summarize_sessions(month_sessions)
     month_avg_seconds = (
         month_effective_seconds // month_days_worked if month_days_worked > 0 else 0
     )
-    month_target_seconds = calculate_monthly_target_seconds(month_days_worked)
     month_overtime_seconds = month_effective_seconds - month_target_seconds
     month_average_start, month_average_end = calculate_average_times(month_sessions)
 

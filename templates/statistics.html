@@ -60,7 +60,10 @@
 </div>
 
 <div class="stats-section">
-    <h2>Letzte Eintr&auml;ge</h2>
+    <div class="section-header">
+        <h2>Letzte Eintr&auml;ge</h2>
+        <button class="btn-edit" onclick="showAddSessionForm()">+ Eintrag hinzuf&uuml;gen</button>
+    </div>
     <div class="sessions-list">
         {% for session in stats.recent_sessions %}
         <div class="session-item" data-session-id="{{ session.id }}" onclick="showSessionDetails({{ session.id }})">

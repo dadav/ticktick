@@ -1,3 +1,14 @@
+// The API answers PUT/POST/DELETE errors with an HTTP error code and a
+// {"detail": "..."} body, so read the detail before touching the DOM.
+async function readErrorDetail(response) {
+  const body = await response.json().catch(() => ({}));
+  // FastAPI request validation reports detail as a list of error objects.
+  if (Array.isArray(body.detail)) {
+    return body.detail.map((item) => item.msg).join(", ");
+  }
+  return body.detail || response.statusText;
+}
+
 async function deleteSession(sessionId) {
   if (!confirm("Moechtest du diesen Eintrag wirklich loeschen?")) {
     return;
@@ -7,26 +18,26 @@ async function deleteSession(sessionId) {
     const response = await fetch(`/api/sessions/${sessionId}`, {
       method: "DELETE",
     });
-    const data = await response.json();
 
-    if (data.success) {
-      // Remove the session item from the DOM
-      const sessionItem = document.querySelector(
-        `[data-session-id="${sessionId}"]`,
-      );
-      if (sessionItem) {
-        sessionItem.style.transition = "opacity 0.3s";
-        sessionItem.style.opacity = "0";
-        setTimeout(() => {
-          sessionItem.remove();
-          checkEmptyList();
-        }, 300);
-      }
-      // Refresh statistics after successful deletion
-      await refreshStatistics();
-    } else {
-      alert("Fehler: " + data.message);
+    if (!response.ok) {
+      alert("Fehler: " + (await readErrorDetail(response)));
+      return;
     }
+
+    // Remove the session item from the DOM
+    const sessionItem = document.querySelector(
+      `[data-session-id="${sessionId}"]`,
+    );
+    if (sessionItem) {
+      sessionItem.style.transition = "opacity 0.3s";
+      sessionItem.style.opacity = "0";
+      setTimeout(() => {
+        sessionItem.remove();
+        checkEmptyList();
+      }, 300);
+    }
+    // Refresh statistics after successful deletion
+    await refreshStatistics();
   } catch (error) {
     console.error("Fehler beim Loeschen:", error);
     alert("Fehler beim Loeschen des Eintrags.");
@@ -276,15 +287,15 @@ async function saveSessionEdit(sessionId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = await response.json();
 
-    if (data.success) {
-      // Re-fetch and re-render the details
-      await showSessionDetails(sessionId);
-      await refreshStatistics();
-    } else {
-      alert("Fehler: " + data.message);
+    if (!response.ok) {
+      alert("Fehler: " + (await readErrorDetail(response)));
+      return;
     }
+
+    // Re-fetch and re-render the details
+    await showSessionDetails(sessionId);
+    await refreshStatistics();
   } catch (error) {
     console.error("Fehler beim Speichern:", error);
     alert("Fehler beim Speichern der Aenderungen.");
@@ -293,6 +304,67 @@ async function saveSessionEdit(sessionId) {
 
 async function cancelEdit(sessionId) {
   await showSessionDetails(sessionId);
+}
+
+function showAddSessionForm() {
+  const modal = document.getElementById("session-modal");
+  const modalBody = document.getElementById("modal-body");
+  const today = new Date().toISOString().slice(0, 10);
+
+  modalBody.innerHTML = `
+    <div class="detail-section">
+      <div class="detail-row">
+        <span class="label">Datum:</span>
+        <span class="value"><input type="date" id="add-date" value="${today}" max="${today}" /></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Startzeit:</span>
+        <span class="value"><input type="time" id="add-start" value="08:00" /></span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Endzeit:</span>
+        <span class="value"><input type="time" id="add-end" value="16:30" /></span>
+      </div>
+      <div class="detail-row" style="margin-top: 0.5rem;">
+        <span></span>
+        <span class="edit-actions">
+          <button class="btn-edit btn-save" onclick="saveNewSession()">Speichern</button>
+          <button class="btn-edit btn-cancel" onclick="closeModal()">Abbrechen</button>
+        </span>
+      </div>
+    </div>
+  `;
+
+  modal.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+async function saveNewSession() {
+  const body = {
+    date: document.getElementById("add-date").value,
+    start_time: document.getElementById("add-start").value,
+    end_time: document.getElementById("add-end").value,
+  };
+
+  try {
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      alert("Fehler: " + (await readErrorDetail(response)));
+      return;
+    }
+
+    closeModal();
+    // The recent-sessions list is server-rendered, so reload to show the entry.
+    window.location.reload();
+  } catch (error) {
+    console.error("Fehler beim Anlegen:", error);
+    alert("Fehler beim Anlegen des Eintrags.");
+  }
 }
 
 function closeModal() {

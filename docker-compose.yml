@@ -7,6 +7,8 @@ services:
     volumes:
       - ./data:/app/data
     environment:
+      # Timestamps are naive local time, so the container needs the user's zone
+      - TZ=${TZ:-Europe/Berlin}
       - TICKTICK_DB_PATH=/app/data/ticktick.db
       - TICKTICK_WEEKLY_HOURS=${TICKTICK_WEEKLY_HOURS:-41}
       - TICKTICK_MAX_DAILY_HOURS=${TICKTICK_MAX_DAILY_HOURS:-10}

@@ -46,7 +46,9 @@ def calculate_pause_seconds(session: WorkSession, now: datetime | None = None) -
     return total_pause
 
 
-def calculate_net_work_seconds(session: WorkSession, now: datetime | None = None) -> int:
+def calculate_net_work_seconds(
+    session: WorkSession, now: datetime | None = None
+) -> int:
     """Calculate net work time in seconds (elapsed - pauses)"""
     if now is None:
         now = datetime.now()
@@ -61,6 +63,27 @@ def calculate_net_work_seconds(session: WorkSession, now: datetime | None = None
     return min(net, MAX_DAILY_SECONDS)
 
 
+def calculate_capped_end_time(session: WorkSession, now: datetime) -> datetime:
+    """Return the exact time at which net work reached MAX_DAILY_SECONDS.
+
+    Walks the work intervals between pauses. Assumes the session's net work has
+    already reached MAX_DAILY_SECONDS, so the cap is always hit inside one of
+    the intervals or in the final open-ended one.
+    """
+    pauses = sorted(session.pause_periods, key=lambda p: p.pause_start)
+    cursor = session.start_time
+    net = 0.0
+
+    for pause in pauses:
+        work = (pause.pause_start - cursor).total_seconds()
+        if net + work >= MAX_DAILY_SECONDS:
+            return cursor + timedelta(seconds=MAX_DAILY_SECONDS - net)
+        net += work
+        cursor = pause.pause_end or now
+
+    return cursor + timedelta(seconds=MAX_DAILY_SECONDS - net)
+
+
 def calculate_lunch_break_minutes(work_minutes: float) -> int:
     """Return lunch break duration if working more than threshold"""
     if work_minutes > LUNCH_THRESHOLD_HOURS * 60:
@@ -68,43 +91,44 @@ def calculate_lunch_break_minutes(work_minutes: float) -> int:
     return 0
 
 
-def calculate_earliest_leave(start_time: datetime, pause_minutes: int) -> datetime:
+def calculate_earliest_leave(start_time: datetime, pause_seconds: int) -> datetime:
     """
     Calculate earliest possible leave time (minimum 6 hours work).
     earliest_leave = start_time + 6h + pause_time
     No lunch break at 6h since it's exactly at threshold.
     """
     work_minutes = MIN_WORK_HOURS * 60
-    total_minutes = work_minutes + pause_minutes
-    return start_time + timedelta(minutes=total_minutes)
+    return start_time + timedelta(minutes=work_minutes, seconds=pause_seconds)
 
 
-def calculate_normal_leave(start_time: datetime, pause_minutes: int) -> datetime:
+def calculate_normal_leave(start_time: datetime, pause_seconds: int) -> datetime:
     """
     Calculate normal leave time (daily requirement of 8h 12m).
     normal_leave = start_time + 8h12m + pause_time + lunch_break
     """
     work_minutes = DAILY_REQUIREMENT_MINUTES
     lunch_break = LUNCH_DURATION_MINUTES  # Always applies since 8h12m > 6h
-    total_minutes = work_minutes + pause_minutes + lunch_break
-    return start_time + timedelta(minutes=total_minutes)
+    return start_time + timedelta(
+        minutes=work_minutes + lunch_break, seconds=pause_seconds
+    )
 
 
-def calculate_latest_leave(start_time: datetime, pause_minutes: int) -> datetime:
+def calculate_latest_leave(start_time: datetime, pause_seconds: int) -> datetime:
     """
     Calculate maximum allowed leave time (10 hour work day limit).
     latest_leave = start_time + 10h + pause_time + lunch_break
     """
     work_minutes = MAX_DAILY_HOURS * 60
     lunch_break = LUNCH_DURATION_MINUTES
-    total_minutes = work_minutes + pause_minutes + lunch_break
-    return start_time + timedelta(minutes=total_minutes)
+    return start_time + timedelta(
+        minutes=work_minutes + lunch_break, seconds=pause_seconds
+    )
 
 
-def calculate_lunch_break_time(start_time: datetime, pause_minutes: int) -> datetime:
+def calculate_lunch_break_time(start_time: datetime, pause_seconds: int) -> datetime:
     """Calculate when lunch break starts being applied"""
-    threshold_minutes = LUNCH_THRESHOLD_HOURS * 60 + pause_minutes
-    return start_time + timedelta(minutes=threshold_minutes)
+    threshold_minutes = LUNCH_THRESHOLD_HOURS * 60
+    return start_time + timedelta(minutes=threshold_minutes, seconds=pause_seconds)
 
 
 def calculate_remaining_for_daily(net_work_seconds: int, lunch_applies: bool) -> int:

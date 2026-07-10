@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.config import MAX_DAILY_SECONDS, WEEKLY_HOURS
 from app.models import TimerState, WorkSession, PausePeriod
 from app.database import Base
 from app.routers import api
@@ -173,6 +174,29 @@ class BackendFixesTestCase(unittest.TestCase):
         self.assertTrue(delete_result.success)
         self.assertEqual(delete_result.status, "running")
 
+    def test_delete_session_raises_404_when_not_found(self) -> None:
+        """delete_session raises HTTP 404 for a non-existent session."""
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
+        self.db.add(state)
+        self.db.commit()
+
+        with self.assertRaises(HTTPException) as context:
+            timer.delete_session(self.db, 999)
+
+        self.assertEqual(context.exception.status_code, 404)
+
+    def test_delete_session_raises_409_for_active_session(self) -> None:
+        """delete_session raises HTTP 409 when targeting the active session."""
+        start_result = timer.start_timer(self.db)
+        self.assertTrue(start_result.success)
+        active_session = timer.get_active_session(self.db)
+
+        with self.assertRaises(HTTPException) as context:
+            timer.delete_session(self.db, active_session.id)
+
+        self.assertEqual(context.exception.status_code, 409)
 
     def test_update_session_changes_end_time_and_recalculates(self) -> None:
         """update_session recalculates net_seconds after changing end_time."""
@@ -185,7 +209,9 @@ class BackendFixesTestCase(unittest.TestCase):
             status="completed",
         )
         self.db.add(session)
-        state = TimerState(id=1, is_running=False, is_paused=False, current_session_id=None)
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
         self.db.add(state)
         self.db.commit()
         self.db.refresh(session)
@@ -209,13 +235,42 @@ class BackendFixesTestCase(unittest.TestCase):
         self.db.commit()
         self.db.refresh(session)
 
-        state = TimerState(id=1, is_running=True, is_paused=False, current_session_id=session.id)
+        state = TimerState(
+            id=1, is_running=True, is_paused=False, current_session_id=session.id
+        )
         self.db.add(state)
         self.db.commit()
 
-        result = timer.update_session(self.db, session.id, "09:00", None)
-        self.assertFalse(result.success)
-        self.assertIn("active", result.message.lower())
+        with self.assertRaises(HTTPException) as context:
+            timer.update_session(self.db, session.id, "09:00", None)
+
+        self.assertEqual(context.exception.status_code, 409)
+        self.assertIn("active", context.exception.detail.lower())
+
+    def test_update_session_blocks_non_completed_session(self) -> None:
+        """update_session refuses to edit a discarded (reset) session."""
+        now = datetime(2026, 2, 19, 8, 0, 0)
+        session = WorkSession(
+            date=now.date(),
+            start_time=now,
+            end_time=now.replace(hour=9, minute=0),
+            status="reset",
+        )
+        self.db.add(session)
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
+        self.db.add(state)
+        self.db.commit()
+        self.db.refresh(session)
+
+        with self.assertRaises(HTTPException) as context:
+            timer.update_session(self.db, session.id, None, "17:00")
+
+        self.assertEqual(context.exception.status_code, 409)
+
+        self.db.refresh(session)
+        self.assertIsNone(session.net_seconds)
 
     def test_update_session_validates_start_before_end(self) -> None:
         """update_session rejects start >= end."""
@@ -228,14 +283,18 @@ class BackendFixesTestCase(unittest.TestCase):
             status="completed",
         )
         self.db.add(session)
-        state = TimerState(id=1, is_running=False, is_paused=False, current_session_id=None)
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
         self.db.add(state)
         self.db.commit()
         self.db.refresh(session)
 
-        result = timer.update_session(self.db, session.id, "17:00", "16:00")
-        self.assertFalse(result.success)
-        self.assertIn("before", result.message.lower())
+        with self.assertRaises(HTTPException) as context:
+            timer.update_session(self.db, session.id, "17:00", "16:00")
+
+        self.assertEqual(context.exception.status_code, 422)
+        self.assertIn("before", context.exception.detail.lower())
 
     def test_update_session_validates_against_pauses(self) -> None:
         """update_session rejects end_time before last pause end."""
@@ -257,24 +316,174 @@ class BackendFixesTestCase(unittest.TestCase):
             pause_end=datetime(2026, 2, 19, 13, 0, 0),
         )
         self.db.add(pause)
-        state = TimerState(id=1, is_running=False, is_paused=False, current_session_id=None)
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
         self.db.add(state)
         self.db.commit()
 
         # Try setting end_time before the pause ends
-        result = timer.update_session(self.db, session.id, None, "12:30")
-        self.assertFalse(result.success)
-        self.assertIn("pause", result.message.lower())
+        with self.assertRaises(HTTPException) as context:
+            timer.update_session(self.db, session.id, None, "12:30")
+
+        self.assertEqual(context.exception.status_code, 422)
+        self.assertIn("pause", context.exception.detail.lower())
 
     def test_update_session_not_found(self) -> None:
-        """update_session returns failure for non-existent session."""
-        state = TimerState(id=1, is_running=False, is_paused=False, current_session_id=None)
+        """update_session raises HTTP 404 for a non-existent session."""
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
         self.db.add(state)
         self.db.commit()
 
-        result = timer.update_session(self.db, 999, "09:00", "17:00")
-        self.assertFalse(result.success)
-        self.assertIn("not found", result.message.lower())
+        with self.assertRaises(HTTPException) as context:
+            timer.update_session(self.db, 999, "09:00", "17:00")
+
+        self.assertEqual(context.exception.status_code, 404)
+        self.assertIn("not found", context.exception.detail.lower())
+
+    def test_auto_stop_uses_capped_end_time(self) -> None:
+        """Auto-stop ends the session when the cap was hit, not when polled."""
+        base_now = datetime(2026, 2, 19, 7, 0, 0)
+
+        with patch("app.services.timer.datetime") as timer_datetime:
+            timer_datetime.now.return_value = base_now
+            timer.start_timer(self.db)
+
+        # Nobody polled for 12 hours: the cap was reached after 10h of work.
+        later = base_now + timedelta(hours=12)
+
+        with (
+            patch("app.services.timer.datetime") as timer_datetime,
+            patch(
+                "app.services.calculations.datetime", wraps=datetime
+            ) as calc_datetime,
+        ):
+            timer_datetime.now.return_value = later
+            calc_datetime.now.return_value = later
+            status = timer.get_status(self.db)
+
+        self.assertTrue(status.auto_stopped)
+
+        session = self.db.query(WorkSession).first()
+        self.assertEqual(session.end_time, base_now + timedelta(hours=10))
+        self.assertEqual(session.net_seconds, MAX_DAILY_SECONDS)
+
+    def test_auto_stop_capped_end_time_accounts_for_pauses(self) -> None:
+        """A closed pause pushes the capped end time out by its duration."""
+        start = datetime(2026, 2, 19, 7, 0, 0)
+        session = WorkSession(date=start.date(), start_time=start, status="active")
+        self.db.add(session)
+        self.db.commit()
+        self.db.refresh(session)
+
+        pause = PausePeriod(
+            session_id=session.id,
+            pause_start=start + timedelta(hours=4),
+            pause_end=start + timedelta(hours=5),
+        )
+        self.db.add(pause)
+        state = TimerState(
+            id=1, is_running=True, is_paused=False, current_session_id=session.id
+        )
+        self.db.add(state)
+        self.db.commit()
+
+        later = start + timedelta(hours=14)
+
+        with (
+            patch("app.services.timer.datetime") as timer_datetime,
+            patch(
+                "app.services.calculations.datetime", wraps=datetime
+            ) as calc_datetime,
+        ):
+            timer_datetime.now.return_value = later
+            calc_datetime.now.return_value = later
+            status = timer.get_status(self.db)
+
+        self.assertTrue(status.auto_stopped)
+
+        self.db.refresh(session)
+        # 10h of net work plus the 1h pause
+        self.assertEqual(session.end_time, start + timedelta(hours=11))
+        self.assertEqual(session.net_seconds, MAX_DAILY_SECONDS)
+
+    def test_statistics_deduct_lunch_once_per_day(self) -> None:
+        """Two short sessions on one day share a single lunch deduction and target."""
+        now = datetime.now()
+        day = now.date()
+        morning = WorkSession(
+            date=day,
+            start_time=datetime(day.year, day.month, day.day, 8, 0),
+            end_time=datetime(day.year, day.month, day.day, 12, 0),
+            net_seconds=4 * 3600,
+            status="completed",
+        )
+        afternoon = WorkSession(
+            date=day,
+            start_time=datetime(day.year, day.month, day.day, 13, 0),
+            end_time=datetime(day.year, day.month, day.day, 17, 0),
+            net_seconds=4 * 3600,
+            status="completed",
+        )
+        self.db.add_all([morning, afternoon])
+        self.db.commit()
+
+        summary = statistics.get_statistics(self.db)
+
+        self.assertEqual(summary.this_week.days_worked, 1)
+        # 8h summed net work exceeds the 6h threshold, so one 30min lunch applies
+        self.assertEqual(summary.this_week.total_seconds, 8 * 3600 - 1800)
+        self.assertEqual(summary.this_week.target_seconds, int(WEEKLY_HOURS * 3600 / 5))
+        self.assertEqual(summary.this_month.days_worked, 1)
+        self.assertEqual(summary.this_month.total_seconds, 8 * 3600 - 1800)
+
+    def test_create_manual_session(self) -> None:
+        """A manually added past session is stored as completed with net seconds."""
+        yesterday = (datetime.now() - timedelta(days=1)).date()
+
+        result = timer.create_manual_session(
+            self.db, yesterday.strftime("%Y-%m-%d"), "08:00", "16:30"
+        )
+        self.assertTrue(result.success)
+        self.assertEqual(result.status, "idle")
+
+        session = self.db.query(WorkSession).first()
+        self.assertEqual(session.status, "completed")
+        self.assertEqual(session.date, yesterday)
+        self.assertEqual(session.net_seconds, 8 * 3600 + 1800)
+
+        summary = statistics.get_statistics(self.db)
+        self.assertEqual(summary.this_month.days_worked, 1)
+
+    def test_create_manual_session_rejects_start_after_end(self) -> None:
+        yesterday = (datetime.now() - timedelta(days=1)).date()
+
+        with self.assertRaises(HTTPException) as context:
+            timer.create_manual_session(
+                self.db, yesterday.strftime("%Y-%m-%d"), "17:00", "08:00"
+            )
+
+        self.assertEqual(context.exception.status_code, 422)
+        self.assertEqual(self.db.query(WorkSession).count(), 0)
+
+    def test_create_manual_session_rejects_future_session(self) -> None:
+        tomorrow = (datetime.now() + timedelta(days=1)).date()
+
+        with self.assertRaises(HTTPException) as context:
+            timer.create_manual_session(
+                self.db, tomorrow.strftime("%Y-%m-%d"), "08:00", "16:00"
+            )
+
+        self.assertEqual(context.exception.status_code, 422)
+        self.assertIn("past", context.exception.detail.lower())
+
+    def test_create_manual_session_rejects_invalid_format(self) -> None:
+        with self.assertRaises(HTTPException) as context:
+            timer.create_manual_session(self.db, "19.02.2026", "8 Uhr", "16:00")
+
+        self.assertEqual(context.exception.status_code, 422)
 
 
 if __name__ == "__main__":

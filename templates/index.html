@@ -39,15 +39,15 @@
     </div>
     <hr>
     <div class="summary-row">
-        <span class="label">Frühester Feierabend (6 Std.):</span>
+        <span class="label">Frühester Feierabend ({{ min_work_label }}):</span>
         <span class="value" id="earliest-leave">--:--</span>
     </div>
     <div class="summary-row highlight">
-        <span class="label">Regulärer Feierabend (8 Std. 12 Min.):</span>
+        <span class="label">Regulärer Feierabend ({{ daily_label }}):</span>
         <span class="value" id="normal-leave">--:--</span>
     </div>
     <div class="summary-row">
-        <span class="label">Spätester Feierabend (10 Std.):</span>
+        <span class="label">Spätester Feierabend ({{ max_daily_label }}):</span>
         <span class="value" id="latest-leave">--:--</span>
     </div>
     <div class="summary-row">
@@ -58,5 +58,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script>window.TICKTICK_CONFIG = { maxDailyLabel: "{{ max_daily_label }}" };</script>
 <script src="/static/js/timer.js?v={{ version }}"></script>
 {% endblock %}

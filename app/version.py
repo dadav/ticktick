@@ -1,4 +1,5 @@
 """Version information from pyproject.toml"""
+
 from pathlib import Path
 import tomllib
 

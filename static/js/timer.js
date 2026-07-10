@@ -82,16 +82,33 @@ function updateUI(data) {
     }
 }
 
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// Only toast once per outage instead of every failed poll.
+let offline = false;
+
 async function fetchStatus() {
     try {
         const response = await fetch('/api/status');
         const data = await response.json();
         if (data.auto_stopped) {
-            alert('Maximale tägliche Arbeitszeit (10 Stunden) erreicht. Timer wurde automatisch gestoppt.');
+            const maxDailyLabel = (window.TICKTICK_CONFIG && window.TICKTICK_CONFIG.maxDailyLabel) || '10 Std.';
+            alert(`Maximale tägliche Arbeitszeit (${maxDailyLabel}) erreicht. Timer wurde automatisch gestoppt.`);
         }
+        offline = false;
         updateUI(data);
     } catch (error) {
         console.error('Fehler beim Abrufen des Status:', error);
+        if (!offline) {
+            offline = true;
+            showToast('Server nicht erreichbar');
+        }
     }
 }
 
@@ -103,9 +120,11 @@ async function sendAction(action) {
             fetchStatus();
         } else {
             console.error('Aktion fehlgeschlagen:', data.message);
+            showToast(data.message);
         }
     } catch (error) {
         console.error('Fehler beim Senden der Aktion:', error);
+        showToast('Server nicht erreichbar');
     }
 }
 

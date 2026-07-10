@@ -2,7 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import StatusResponse, ActionResponse, StatisticsResponse, SessionDetailResponse, SessionUpdateRequest
+from app.schemas import (
+    StatusResponse,
+    ActionResponse,
+    StatisticsResponse,
+    SessionDetailResponse,
+    SessionCreateRequest,
+    SessionUpdateRequest,
+)
 from app.services import timer
 from app.services import statistics
 
@@ -51,6 +58,12 @@ def get_statistics(db: Session = Depends(get_db)):
     return statistics.get_statistics(db)
 
 
+@router.post("/sessions", response_model=ActionResponse, status_code=201)
+def create_session(body: SessionCreateRequest, db: Session = Depends(get_db)):
+    """Manually add a completed session for a past day"""
+    return timer.create_manual_session(db, body.date, body.start_time, body.end_time)
+
+
 @router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
 def get_session_details(session_id: int, db: Session = Depends(get_db)):
     """Get detailed information about a specific session including pauses"""
@@ -61,7 +74,9 @@ def get_session_details(session_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/sessions/{session_id}", response_model=ActionResponse)
-def update_session(session_id: int, body: SessionUpdateRequest, db: Session = Depends(get_db)):
+def update_session(
+    session_id: int, body: SessionUpdateRequest, db: Session = Depends(get_db)
+):
     """Update start/end time of a completed session"""
     return timer.update_session(db, session_id, body.start_time, body.end_time)
 

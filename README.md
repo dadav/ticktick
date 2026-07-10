@@ -64,6 +64,7 @@ cp .env.example .env
 | `TICKTICK_LUNCH_DURATION`  | `30`                 | Lunch break duration in minutes           |
 | `TICKTICK_HOST`            | `0.0.0.0`            | Server bind address                       |
 | `TICKTICK_PORT`            | `8000`               | Server port                               |
+| `TZ`                       | `Europe/Berlin`      | Container timezone (Docker only)          |
 
 ### Examples
 
@@ -115,15 +116,19 @@ View your work history including:
 
 ## API Endpoints
 
-| Method | Endpoint                  | Description               |
-| ------ | ------------------------- | ------------------------- |
-| `GET`  | `/api/status`             | Get current timer status  |
-| `POST` | `/api/start`              | Start a new session       |
-| `POST` | `/api/pause`              | Pause the current session |
-| `POST` | `/api/continue`           | Resume from pause         |
-| `POST` | `/api/stop`               | Stop and save session     |
-| `POST` | `/api/reset`              | Discard current session   |
-| `GET`  | `/api/statistics/summary` | Get weekly/monthly stats  |
+| Method   | Endpoint                  | Description                            |
+| -------- | ------------------------- | -------------------------------------- |
+| `GET`    | `/api/status`             | Get current timer status               |
+| `POST`   | `/api/start`              | Start a new session                    |
+| `POST`   | `/api/pause`              | Pause the current session              |
+| `POST`   | `/api/continue`           | Resume from pause                      |
+| `POST`   | `/api/stop`               | Stop and save session                  |
+| `POST`   | `/api/reset`              | Discard current session                |
+| `GET`    | `/api/statistics/summary` | Get weekly/monthly stats               |
+| `POST`   | `/api/sessions`           | Manually add a completed past session  |
+| `GET`    | `/api/sessions/{id}`      | Get session details with pause periods |
+| `PUT`    | `/api/sessions/{id}`      | Update start/end time of a session     |
+| `DELETE` | `/api/sessions/{id}`      | Delete a non-active session            |
 
 ## Data Persistence
 

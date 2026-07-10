@@ -16,8 +16,8 @@ class Calculations(BaseModel):
     lunch_break_applies: bool
     lunch_break_at: str | None
     earliest_leave: str  # 6h work
-    normal_leave: str    # 8h12m work (daily requirement)
-    latest_leave: str    # 10h work (max)
+    normal_leave: str  # 8h12m work (daily requirement)
+    latest_leave: str  # 10h work (max)
     remaining_for_daily: str
     overtime_seconds: int
     overtime_formatted: str
@@ -57,7 +57,7 @@ class WeekSummary(BaseModel):
     overtime_seconds: int
     overtime_formatted: str
     average_start_time: str | None  # HH:MM format
-    average_end_time: str | None    # HH:MM format
+    average_end_time: str | None  # HH:MM format
 
 
 class MonthSummary(BaseModel):
@@ -68,7 +68,7 @@ class MonthSummary(BaseModel):
     overtime_seconds: int
     overtime_formatted: str
     average_start_time: str | None  # HH:MM format
-    average_end_time: str | None    # HH:MM format
+    average_end_time: str | None  # HH:MM format
 
 
 class StatisticsResponse(BaseModel):
@@ -86,7 +86,13 @@ class PausePeriodInfo(BaseModel):
 
 class SessionUpdateRequest(BaseModel):
     start_time: str | None = None  # HH:MM format
-    end_time: str | None = None    # HH:MM format
+    end_time: str | None = None  # HH:MM format
+
+
+class SessionCreateRequest(BaseModel):
+    date: str  # YYYY-MM-DD format
+    start_time: str  # HH:MM format
+    end_time: str  # HH:MM format
 
 
 class SessionDetailResponse(BaseModel):
