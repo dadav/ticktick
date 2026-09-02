@@ -1,4 +1,4 @@
-FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
+FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6
 
 # Install uv, curl for healthcheck and tzdata so TZ can be set at runtime
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
