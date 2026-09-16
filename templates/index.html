@@ -4,8 +4,10 @@
 
 {% block content %}
 <div class="timer-display">
+    <div class="timer-caption" id="timer-caption">Anrechenbare Arbeitszeit heute</div>
     <div class="time" id="current-time">00:00:00</div>
     <div class="status" id="status-text">Bereit</div>
+    <p class="day-notice" id="day-notice" role="status" hidden></p>
 </div>
 
 <div class="controls">
@@ -20,39 +22,52 @@
 </div>
 
 <div class="summary" id="summary" style="display: none;">
-    <h2>Heutige Arbeitszeit</h2>
+    <h2 id="summary-title">Heutige Arbeitszeit</h2>
     <div class="summary-row">
-        <span class="label">Gestartet um:</span>
+        <span class="label">Erster Start:</span>
         <span class="value" id="start-time">--:--</span>
     </div>
     <div class="summary-row">
-        <span class="label">Nettoarbeitszeit:</span>
+        <span class="label">Erfasste Arbeitszeit:</span>
         <span class="value" id="net-time">00:00:00</span>
     </div>
+    <div class="summary-row" id="session-time-row" hidden>
+        <span class="label">Aktueller Eintrag:</span>
+        <span class="value" id="session-time">00:00:00</span>
+    </div>
     <div class="summary-row">
-        <span class="label">Pausen:</span>
+        <span class="label">Pausen inkl. Unterbrechungen:</span>
         <span class="value" id="pause-info">0 Pausen (00:00:00)</span>
+    </div>
+    <div class="summary-row">
+        <span class="label">Automatischer Pausenabzug:</span>
+        <span class="value" id="lunch-deduction">00:00:00</span>
     </div>
     <div class="summary-row" id="overtime-row">
         <span class="label">Überstunden:</span>
         <span class="value" id="overtime">--:--:--</span>
     </div>
     <hr>
-    <div class="summary-row">
+    <div class="summary-row forecast-row" hidden>
         <span class="label">Frühester Feierabend ({{ min_work_label }}):</span>
         <span class="value" id="earliest-leave">--:--</span>
     </div>
-    <div class="summary-row highlight">
+    <div class="summary-row highlight forecast-row" hidden>
         <span class="label">Regulärer Feierabend ({{ daily_label }}):</span>
         <span class="value" id="normal-leave">--:--</span>
     </div>
-    <div class="summary-row">
+    <div class="summary-row forecast-row" hidden>
         <span class="label">Spätester Feierabend ({{ max_daily_label }}):</span>
         <span class="value" id="latest-leave">--:--</span>
     </div>
+    <p class="summary-note" id="forecast-note" hidden>Feierabend bei sofortiger Fortsetzung.</p>
     <div class="summary-row">
         <span class="label">Verbleibend für Tagessoll:</span>
         <span class="value" id="remaining">--:--:--</span>
+    </div>
+    <div class="summary-row">
+        <span class="label">Verbleibend bis Tagesmaximum:</span>
+        <span class="value" id="remaining-max">--:--:--</span>
     </div>
 </div>
 {% endblock %}

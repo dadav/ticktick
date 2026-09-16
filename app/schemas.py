@@ -12,12 +12,40 @@ class SessionInfo(BaseModel):
     total_pause_seconds: int
 
 
+class DailySummary(BaseModel):
+    date: str
+    start_time: datetime
+    end_time: datetime
+    session_count: int
+    actual_work_seconds: int
+    actual_work_formatted: str
+    credited_work_seconds: int
+    credited_work_formatted: str
+    pause_count: int
+    total_pause_seconds: int
+    total_pause_formatted: str
+    lunch_deduction_seconds: int
+    lunch_deduction_formatted: str
+    lunch_break_applies: bool
+    remaining_for_earliest_seconds: int
+    remaining_for_daily_seconds: int
+    remaining_for_daily: str
+    remaining_for_max_seconds: int
+    remaining_for_max: str
+    overtime_seconds: int
+    overtime_formatted: str
+    target_reached: bool
+    cap_reached: bool
+    cap_exceeded: bool
+
+
 class Calculations(BaseModel):
     lunch_break_applies: bool
     lunch_break_at: str | None
-    earliest_leave: str  # 6h work
-    normal_leave: str  # 8h12m work (daily requirement)
-    latest_leave: str  # 10h work (max)
+    earliest_leave: str | None
+    normal_leave: str | None
+    latest_leave: str | None
+    earliest_reached: bool = False
     remaining_for_daily: str
     overtime_seconds: int
     overtime_formatted: str
@@ -28,6 +56,9 @@ class StatusResponse(BaseModel):
     session: SessionInfo | None
     calculations: Calculations | None
     auto_stopped: bool = False
+    day: DailySummary | None = None
+    can_start: bool = True
+    start_blocked_reason: str | None = None
 
 
 class ActionResponse(BaseModel):
@@ -71,10 +102,16 @@ class MonthSummary(BaseModel):
     average_end_time: str | None  # HH:MM format
 
 
+class DayHistory(BaseModel):
+    day: DailySummary
+    sessions: list[SessionSummary]
+
+
 class StatisticsResponse(BaseModel):
     this_week: WeekSummary
     this_month: MonthSummary
     recent_sessions: list[SessionSummary]
+    recent_days: list[DayHistory]
 
 
 class PausePeriodInfo(BaseModel):

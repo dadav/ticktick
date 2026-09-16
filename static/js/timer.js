@@ -16,6 +16,15 @@ const elements = {
     normalLeave: document.getElementById('normal-leave'),
     latestLeave: document.getElementById('latest-leave'),
     remaining: document.getElementById('remaining'),
+    remainingMax: document.getElementById('remaining-max'),
+    caption: document.getElementById('timer-caption'),
+    summaryTitle: document.getElementById('summary-title'),
+    notice: document.getElementById('day-notice'),
+    sessionTime: document.getElementById('session-time'),
+    sessionTimeRow: document.getElementById('session-time-row'),
+    lunchDeduction: document.getElementById('lunch-deduction'),
+    forecastRows: document.querySelectorAll('.forecast-row'),
+    forecastNote: document.getElementById('forecast-note'),
 };
 
 const statusLabels = {
@@ -38,47 +47,47 @@ function formatTime(dateStr) {
 }
 
 function updateUI(data) {
-    const { status, session, calculations } = data;
-
-    // Update status
+    const { status, session, calculations, day, can_start, start_blocked_reason } = data;
     elements.statusText.textContent = statusLabels[status] || status;
     elements.statusText.className = 'status ' + status;
-
-    // Update buttons
-    elements.btnStart.disabled = status !== 'idle';
+    elements.btnStart.disabled = !can_start;
+    elements.btnStart.title = start_blocked_reason || '';
     elements.btnPause.disabled = status !== 'running';
     elements.btnContinue.disabled = status !== 'paused';
     elements.btnStop.disabled = status === 'idle';
     elements.btnReset.disabled = status === 'idle';
+    elements.currentTime.textContent = day ? day.credited_work_formatted : '00:00:00';
+    elements.summary.style.display = day ? 'block' : 'none';
+    elements.sessionTimeRow.hidden = !session;
+    elements.forecastRows.forEach(row => { row.hidden = !session; });
+    elements.forecastNote.hidden = status !== 'paused';
+    elements.caption.textContent = day ? `Anrechenbare Arbeitszeit · ${day.date}` : 'Anrechenbare Arbeitszeit heute';
 
-    if (session) {
-        elements.currentTime.textContent = session.net_work_formatted;
-        elements.summary.style.display = 'block';
-        elements.startTime.textContent = formatTime(session.start_time);
-        elements.netTime.textContent = session.net_work_formatted;
+    let notice = start_blocked_reason || '';
+    if (day && day.cap_exceeded) {
+        notice = 'Tagesmaximum überschritten. Aufgezeichnete Zeiten bleiben erhalten.';
+    } else if (day && day.target_reached && !notice) {
+        notice = 'Tagessoll erreicht.';
+    }
+    elements.notice.textContent = notice;
+    elements.notice.hidden = !notice;
+    if (!day) return;
 
-        const pauseLabel = session.pause_count === 1 ? 'Pause' : 'Pausen';
-        elements.pauseInfo.textContent = `${session.pause_count} ${pauseLabel} (${formatDuration(session.total_pause_seconds)})`;
-
-        if (calculations) {
-            // Update overtime display
-            elements.overtime.textContent = calculations.overtime_formatted;
-            if (calculations.overtime_seconds >= 0) {
-                elements.overtimeRow.classList.add('positive');
-                elements.overtimeRow.classList.remove('negative');
-            } else {
-                elements.overtimeRow.classList.add('negative');
-                elements.overtimeRow.classList.remove('positive');
-            }
-
-            elements.earliestLeave.textContent = calculations.earliest_leave + ' Uhr';
-            elements.normalLeave.textContent = calculations.normal_leave + ' Uhr';
-            elements.latestLeave.textContent = calculations.latest_leave + ' Uhr';
-            elements.remaining.textContent = calculations.remaining_for_daily;
-        }
-    } else {
-        elements.currentTime.textContent = '00:00:00';
-        elements.summary.style.display = 'none';
+    elements.summaryTitle.textContent = `Arbeitszeit am ${day.date} · ${day.session_count} ${day.session_count === 1 ? 'Eintrag' : 'Einträge'}`;
+    elements.startTime.textContent = formatTime(day.start_time);
+    elements.netTime.textContent = day.actual_work_formatted;
+    elements.sessionTime.textContent = session ? session.net_work_formatted : '00:00:00';
+    elements.pauseInfo.textContent = `${day.pause_count} ${day.pause_count === 1 ? 'Pause' : 'Pausen'} (${day.total_pause_formatted})`;
+    elements.lunchDeduction.textContent = day.lunch_deduction_formatted;
+    elements.overtime.textContent = day.overtime_formatted;
+    elements.overtimeRow.classList.toggle('positive', day.overtime_seconds >= 0);
+    elements.overtimeRow.classList.toggle('negative', day.overtime_seconds < 0);
+    elements.remaining.textContent = day.remaining_for_daily;
+    elements.remainingMax.textContent = day.remaining_for_max;
+    if (calculations) {
+        elements.earliestLeave.textContent = calculations.earliest_reached ? 'Erreicht' : (calculations.earliest_leave ? calculations.earliest_leave + ' Uhr' : '--:--');
+        elements.normalLeave.textContent = day.target_reached ? 'Erreicht' : (calculations.normal_leave ? calculations.normal_leave + ' Uhr' : '--:--');
+        elements.latestLeave.textContent = calculations.latest_leave ? calculations.latest_leave + ' Uhr' : '--:--';
     }
 }
 
@@ -96,6 +105,7 @@ let offline = false;
 async function fetchStatus() {
     try {
         const response = await fetch('/api/status');
+        if (!response.ok) throw new Error(`Status ${response.status}`);
         const data = await response.json();
         if (data.auto_stopped) {
             const maxDailyLabel = (window.TICKTICK_CONFIG && window.TICKTICK_CONFIG.maxDailyLabel) || '10 Std.';
@@ -117,10 +127,12 @@ async function sendAction(action) {
         const response = await fetch(`/api/${action}`, { method: 'POST' });
         const data = await response.json();
         if (data.success) {
-            fetchStatus();
+            if (action !== 'stop' && data.status === 'idle') showToast(data.message);
+            await fetchStatus();
         } else {
             console.error('Aktion fehlgeschlagen:', data.message);
             showToast(data.message);
+            await fetchStatus();
         }
     } catch (error) {
         console.error('Fehler beim Senden der Aktion:', error);

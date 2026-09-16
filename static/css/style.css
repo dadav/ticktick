@@ -811,3 +811,66 @@ nav a.active {
         order: 1;
     }
 }
+
+/* Shared daily totals on the timer and history pages. */
+[hidden] {
+    display: none !important;
+}
+
+.timer-caption, .summary-note {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+}
+
+.day-notice {
+    color: var(--color-warning);
+    font-size: 0.9rem;
+    margin-top: 0.75rem;
+}
+
+.workday {
+    margin-bottom: 1.5rem;
+}
+
+.workday-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+}
+
+.workday-header h3 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.workday-total, .workday-overtime {
+    font-size: 0.85rem;
+}
+
+.workday-overtime.positive {
+    color: var(--color-success);
+}
+
+.workday-overtime.negative {
+    color: var(--color-warning);
+}
+
+.workday .summary-note {
+    margin: 0.5rem 0;
+}
+
+.session-open {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}

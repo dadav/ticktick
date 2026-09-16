@@ -15,7 +15,7 @@ update:
 
 # Run the backend regression tests
 test:
-    uv run python -m unittest -v tests/test_backend_fixes.py
+    uv run python -m unittest discover -s tests -v
 
 # Release a version: run tests, bump pyproject.toml, commit and tag (e.g. `just release 0.8.0`)
 release version: test

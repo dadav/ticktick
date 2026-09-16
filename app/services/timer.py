@@ -1,4 +1,6 @@
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -6,22 +8,20 @@ from app.models import WorkSession, PausePeriod, TimerState
 from app.schemas import StatusResponse, SessionInfo, Calculations, ActionResponse
 from app.services.calculations import (
     calculate_capped_end_time,
+    calculate_day,
     calculate_net_work_seconds,
     calculate_pause_seconds,
-    calculate_earliest_leave,
-    calculate_normal_leave,
-    calculate_latest_leave,
-    calculate_lunch_break_time,
-    calculate_remaining_for_daily,
-    calculate_overtime_seconds,
     format_duration,
     format_time,
+    MIN_WORK_HOURS,
 )
-from app.config import LUNCH_THRESHOLD_HOURS, MAX_DAILY_SECONDS
+from app.services.workdays import load_day_sessions
+from app.config import LUNCH_THRESHOLD_HOURS
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_timer_state(db: Session) -> TimerState:
-    """Get or create the singleton timer state record"""
     state = db.query(TimerState).filter(TimerState.id == 1).first()
     if not state:
         state = TimerState(id=1, is_running=False, is_paused=False)
@@ -32,7 +32,6 @@ def get_or_create_timer_state(db: Session) -> TimerState:
 
 
 def get_current_status(db: Session) -> str:
-    """Return the timer state as a status string: idle, running or paused"""
     state = get_or_create_timer_state(db)
     if not state.current_session_id:
         return "idle"
@@ -40,106 +39,153 @@ def get_current_status(db: Session) -> str:
 
 
 def get_active_session(db: Session) -> WorkSession | None:
-    """Get the current active session if any"""
     state = get_or_create_timer_state(db)
     if state.current_session_id:
-        return (
-            db.query(WorkSession)
-            .filter(WorkSession.id == state.current_session_id)
-            .first()
-        )
+        return db.get(WorkSession, state.current_session_id)
     return None
 
 
+def start_blocked_reason(sessions: list[WorkSession], now: datetime) -> str | None:
+    day = calculate_day(sessions, now)
+    if day and day.cap_reached:
+        return "Tagesmaximum erreicht. Heute ist keine weitere Erfassung möglich."
+    # This provisional session counts the gap without persisting it.
+    candidate = WorkSession(date=now.date(), start_time=now, status="active")
+    resumed = calculate_day([*sessions, candidate], now)
+    if resumed.cap_reached:
+        return "Mit der Pausengutschrift wäre das Tagesmaximum bereits erreicht. Kein weiterer Start möglich."
+    return None
+
+
+def _finish_session(
+    db: Session, session: WorkSession, state: TimerState, end: datetime
+) -> None:
+    # Late polling must not leave pauses beyond the corrected session end.
+    for pause in session.pause_periods:
+        pause.pause_start = min(end, max(session.start_time, pause.pause_start))
+        pause.pause_end = min(end, max(pause.pause_start, pause.pause_end or end))
+    session.end_time = end
+    session.net_seconds = calculate_net_work_seconds(session, end)
+    session.status = "completed"
+    state.current_session_id = None
+    state.is_running = False
+    state.is_paused = False
+    db.commit()
+
+
+def _enforce_daily_cap(
+    db: Session, session: WorkSession, state: TimerState, now: datetime
+) -> bool:
+    sessions = load_day_sessions(db, session.date, include_active=True)
+    capped_end = calculate_capped_end_time(sessions, session, now)
+    if capped_end is None:
+        return False
+    session_id = session.id
+    work_date = session.date
+    _finish_session(db, session, state, capped_end)
+    logger.info(
+        "Daily cap stopped session",
+        extra={
+            "session_id": session_id,
+            "work_date": str(work_date),
+            "capped_end": capped_end.isoformat(),
+        },
+    )
+    return True
+
+
 def get_status(db: Session) -> StatusResponse:
-    """Get the current timer status with all calculations"""
     state = get_or_create_timer_state(db)
     session = get_active_session(db)
     now = datetime.now()
-
-    if not session:
-        return StatusResponse(status="idle", session=None, calculations=None)
-
-    net_work_seconds = calculate_net_work_seconds(session, now)
-
-    # Auto-stop when net work reaches the daily maximum
-    if net_work_seconds >= MAX_DAILY_SECONDS:
-        _auto_stop_session(db, session, state, now)
-        return StatusResponse(
-            status="idle",
-            session=None,
-            calculations=None,
-            auto_stopped=True,
+    auto_stopped = bool(session and _enforce_daily_cap(db, session, state, now))
+    if auto_stopped:
+        session = None
+    work_date = session.date if session else now.date()
+    sessions = load_day_sessions(db, work_date, include_active=session is not None)
+    day = calculate_day(sessions, now)
+    blocked_reason = None if session else start_blocked_reason(sessions, now)
+    session_info = None
+    calculations = None
+    if session:
+        actual = calculate_net_work_seconds(session, now)
+        session_info = SessionInfo(
+            id=session.id,
+            start_time=session.start_time,
+            current_time=now,
+            net_work_seconds=actual,
+            net_work_formatted=format_duration(actual),
+            pause_count=sum(
+                p.pause_end is None or p.pause_end > p.pause_start
+                for p in session.pause_periods
+            ),
+            total_pause_seconds=calculate_pause_seconds(session, now),
         )
-
-    status = "paused" if state.is_paused else "running"
-    pause_seconds = calculate_pause_seconds(session, now)
-
-    session_info = SessionInfo(
-        id=session.id,
-        start_time=session.start_time,
-        current_time=now,
-        net_work_seconds=net_work_seconds,
-        net_work_formatted=format_duration(net_work_seconds),
-        pause_count=len(session.pause_periods),
-        total_pause_seconds=pause_seconds,
-    )
-
-    net_work_minutes = net_work_seconds / 60
-    lunch_applies = net_work_minutes > LUNCH_THRESHOLD_HOURS * 60
-    overtime_seconds = calculate_overtime_seconds(net_work_seconds, lunch_applies)
-
-    calculations = Calculations(
-        lunch_break_applies=lunch_applies,
-        lunch_break_at=format_time(
-            calculate_lunch_break_time(session.start_time, pause_seconds)
+    if day:
+        earliest_remaining = day.remaining_for_earliest_seconds
+        calculations = Calculations(
+            earliest_reached=day.credited_work_seconds >= MIN_WORK_HOURS * 3600,
+            lunch_break_applies=day.lunch_break_applies,
+            lunch_break_at=format_time(
+                now
+                + timedelta(
+                    seconds=max(
+                        0, LUNCH_THRESHOLD_HOURS * 3600 - day.actual_work_seconds
+                    )
+                )
+            )
+            if session and not day.lunch_break_applies
+            else None,
+            earliest_leave=format_time(now + timedelta(seconds=earliest_remaining))
+            if session
+            else None,
+            normal_leave=format_time(
+                now + timedelta(seconds=day.remaining_for_daily_seconds)
+            )
+            if session
+            else None,
+            latest_leave=format_time(
+                now + timedelta(seconds=day.remaining_for_max_seconds)
+            )
+            if session
+            else None,
+            remaining_for_daily=day.remaining_for_daily,
+            overtime_seconds=day.overtime_seconds,
+            overtime_formatted=day.overtime_formatted,
         )
-        if not lunch_applies
-        else None,
-        earliest_leave=format_time(
-            calculate_earliest_leave(session.start_time, pause_seconds)
-        ),
-        normal_leave=format_time(
-            calculate_normal_leave(session.start_time, pause_seconds)
-        ),
-        latest_leave=format_time(
-            calculate_latest_leave(session.start_time, pause_seconds)
-        ),
-        remaining_for_daily=format_duration(
-            calculate_remaining_for_daily(net_work_seconds, lunch_applies)
-        ),
-        overtime_seconds=overtime_seconds,
-        overtime_formatted=format_duration(overtime_seconds),
-    )
-
+    status = "idle" if session is None else ("paused" if state.is_paused else "running")
     return StatusResponse(
-        status=status, session=session_info, calculations=calculations
+        status=status,
+        session=session_info,
+        day=day,
+        calculations=calculations,
+        auto_stopped=auto_stopped,
+        can_start=session is None and blocked_reason is None,
+        start_blocked_reason=blocked_reason,
     )
 
 
 def start_timer(db: Session) -> ActionResponse:
-    """Start a new work session"""
     state = get_or_create_timer_state(db)
-
     if state.current_session_id:
         return ActionResponse(
             success=False,
             message="Timer already running",
             status="paused" if state.is_paused else "running",
         )
-
     now = datetime.now()
-    session = WorkSession(
-        date=now.date(),
-        start_time=now,
-        status="active",
-    )
+    reason = start_blocked_reason(load_day_sessions(db, now.date()), now)
+    if reason:
+        logger.info(
+            "Daily cap prevented start",
+            extra={"work_date": now.date().isoformat(), "reason": reason},
+        )
+        return ActionResponse(success=False, message=reason, status="idle")
+    session = WorkSession(date=now.date(), start_time=now, status="active")
     db.add(session)
     db.commit()
     db.refresh(session)
-
-    # Compare-and-set update prevents a race where concurrent starts could both
-    # create sessions and overwrite TimerState.current_session_id.
+    # A losing concurrent start must discard its newly created session.
     rows_updated = (
         db.query(TimerState)
         .filter(TimerState.id == 1, TimerState.current_session_id.is_(None))
@@ -152,7 +198,6 @@ def start_timer(db: Session) -> ActionResponse:
             synchronize_session=False,
         )
     )
-
     if rows_updated == 0:
         db.delete(session)
         db.commit()
@@ -162,119 +207,87 @@ def start_timer(db: Session) -> ActionResponse:
             message="Timer already running",
             status="paused" if current_state.is_paused else "running",
         )
-
     db.commit()
-
     return ActionResponse(success=True, message="Timer started", status="running")
 
 
 def pause_timer(db: Session) -> ActionResponse:
-    """Pause the current session"""
     state = get_or_create_timer_state(db)
     session = get_active_session(db)
-
     if not session:
         return ActionResponse(success=False, message="No active session", status="idle")
-
+    now = datetime.now()
+    if _enforce_daily_cap(db, session, state, now):
+        return ActionResponse(
+            success=True,
+            message="Tagesmaximum erreicht. Timer automatisch gestoppt.",
+            status="idle",
+        )
     if state.is_paused:
         return ActionResponse(
             success=False, message="Timer already paused", status="paused"
         )
-
-    now = datetime.now()
-    pause = PausePeriod(session_id=session.id, pause_start=now)
-    db.add(pause)
-
+    session.pause_periods.append(PausePeriod(pause_start=now))
     state.is_paused = True
     state.is_running = False
     db.commit()
-
     return ActionResponse(success=True, message="Timer paused", status="paused")
 
 
 def continue_timer(db: Session) -> ActionResponse:
-    """Resume from pause"""
     state = get_or_create_timer_state(db)
     session = get_active_session(db)
-
     if not session:
         return ActionResponse(success=False, message="No active session", status="idle")
-
+    now = datetime.now()
+    if _enforce_daily_cap(db, session, state, now):
+        return ActionResponse(
+            success=True,
+            message="Tagesmaximum erreicht. Timer automatisch gestoppt.",
+            status="idle",
+        )
     if not state.is_paused:
         return ActionResponse(
             success=False, message="Timer not paused", status="running"
         )
-
-    # Find the active pause and end it
-    active_pause = (
-        db.query(PausePeriod)
-        .filter(PausePeriod.session_id == session.id, PausePeriod.pause_end.is_(None))
-        .first()
-    )
-
-    if active_pause:
-        active_pause.pause_end = datetime.now()
-
+    for pause in session.pause_periods:
+        if pause.pause_end is None:
+            pause.pause_end = now
     state.is_paused = False
     state.is_running = True
     db.commit()
-
     return ActionResponse(success=True, message="Timer resumed", status="running")
 
 
 def stop_timer(db: Session) -> ActionResponse:
-    """Stop and save the current session"""
     state = get_or_create_timer_state(db)
     session = get_active_session(db)
-
     if not session:
         return ActionResponse(success=False, message="No active session", status="idle")
-
     now = datetime.now()
-
-    # End any active pause
-    active_pause = (
-        db.query(PausePeriod)
-        .filter(PausePeriod.session_id == session.id, PausePeriod.pause_end.is_(None))
-        .first()
-    )
-    if active_pause:
-        active_pause.pause_end = now
-
-    # Calculate and save net work time
-    session.end_time = now
-    session.net_seconds = calculate_net_work_seconds(session, now)
-    session.status = "completed"
-
-    # Reset timer state
-    state.current_session_id = None
-    state.is_running = False
-    state.is_paused = False
-    db.commit()
-
+    if _enforce_daily_cap(db, session, state, now):
+        return ActionResponse(
+            success=True,
+            message="Tagesmaximum erreicht. Timer automatisch gestoppt.",
+            status="idle",
+        )
+    _finish_session(db, session, state, now)
     return ActionResponse(
         success=True, message="Timer stopped and saved", status="idle"
     )
 
 
 def reset_timer(db: Session) -> ActionResponse:
-    """Stop without saving (discard session)"""
     state = get_or_create_timer_state(db)
     session = get_active_session(db)
-
     if not session:
         return ActionResponse(success=False, message="No active session", status="idle")
-
-    # Mark session as reset instead of deleting for audit trail
     session.end_time = datetime.now()
     session.status = "reset"
-
-    # Reset timer state
     state.current_session_id = None
     state.is_running = False
     state.is_paused = False
     db.commit()
-
     return ActionResponse(
         success=True, message="Timer reset (session discarded)", status="idle"
     )
@@ -320,7 +333,7 @@ def create_manual_session(
         date=session_date,
         start_time=start_dt,
         end_time=end_dt,
-        net_seconds=min(int((end_dt - start_dt).total_seconds()), MAX_DAILY_SECONDS),
+        net_seconds=int((end_dt - start_dt).total_seconds()),
         status="completed",
     )
     db.add(session)
@@ -437,31 +450,3 @@ def update_session(
     return ActionResponse(
         success=True, message="Session updated", status=get_current_status(db)
     )
-
-
-def _auto_stop_session(
-    db: Session, session: WorkSession, state: TimerState, now: datetime
-) -> None:
-    """Auto-stop a session that has reached the daily maximum work time."""
-    # The cap may have been reached long before this poll, so end the session at
-    # the exact moment net work hit the limit instead of at `now`.
-    capped_end = calculate_capped_end_time(session, now)
-
-    # An open pause can only start after the cap was reached (net work does not
-    # grow while paused), so clamp it to zero length rather than counting it.
-    active_pause = (
-        db.query(PausePeriod)
-        .filter(PausePeriod.session_id == session.id, PausePeriod.pause_end.is_(None))
-        .first()
-    )
-    if active_pause:
-        active_pause.pause_end = max(active_pause.pause_start, min(now, capped_end))
-
-    session.end_time = capped_end
-    session.net_seconds = MAX_DAILY_SECONDS
-    session.status = "completed"
-
-    state.current_session_id = None
-    state.is_running = False
-    state.is_paused = False
-    db.commit()

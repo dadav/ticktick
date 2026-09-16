@@ -107,7 +107,7 @@ class BackendFixesTestCase(unittest.TestCase):
         self.assertEqual(details.overtime_formatted, "-07:07")
 
     def test_auto_stop_at_max_daily_hours(self) -> None:
-        """Timer auto-stops when net work reaches MAX_DAILY_HOURS."""
+        """Timer auto-stops when credited daily work reaches MAX_DAILY_HOURS."""
         base_now = datetime(2026, 2, 19, 7, 0, 0)
 
         with patch("app.services.timer.datetime") as timer_datetime:
@@ -115,8 +115,8 @@ class BackendFixesTestCase(unittest.TestCase):
             result = timer.start_timer(self.db)
         self.assertTrue(result.success)
 
-        # Advance time by 10h + 30min (net 10h since no pauses, plus buffer)
-        later = base_now + timedelta(hours=10, minutes=1)
+        # Ten credited hours require 10h30m without a recorded lunch break.
+        later = base_now + timedelta(hours=10, minutes=30)
 
         with (
             patch("app.services.timer.datetime") as timer_datetime,
@@ -135,12 +135,11 @@ class BackendFixesTestCase(unittest.TestCase):
         # Session should be completed
         session = self.db.query(WorkSession).first()
         self.assertEqual(session.status, "completed")
-        self.assertEqual(session.net_seconds, 10 * 3600)
+        self.assertEqual(session.net_seconds, 10 * 3600 + 1800)
 
-    def test_net_work_seconds_capped_at_max(self) -> None:
-        """calculate_net_work_seconds never exceeds MAX_DAILY_SECONDS."""
+    def test_net_work_seconds_preserves_actual_work(self) -> None:
+        """Actual session work is preserved; only the daily timer enforces the cap."""
         from app.services.calculations import calculate_net_work_seconds
-        from app.config import MAX_DAILY_SECONDS
 
         now = datetime(2026, 2, 19, 7, 0, 0)
         session = WorkSession(
@@ -151,7 +150,7 @@ class BackendFixesTestCase(unittest.TestCase):
         # 12 hours later, well past the 10h cap
         later = now + timedelta(hours=12)
         result = calculate_net_work_seconds(session, later)
-        self.assertEqual(result, MAX_DAILY_SECONDS)
+        self.assertEqual(result, 12 * 3600)
 
     def test_delete_session_returns_running_status_when_timer_active(self) -> None:
         start_result = timer.start_timer(self.db)
@@ -351,7 +350,7 @@ class BackendFixesTestCase(unittest.TestCase):
             timer_datetime.now.return_value = base_now
             timer.start_timer(self.db)
 
-        # Nobody polled for 12 hours: the cap was reached after 10h of work.
+        # Nobody polled for 12 hours: the credited cap was reached after 10h30m.
         later = base_now + timedelta(hours=12)
 
         with (
@@ -367,8 +366,8 @@ class BackendFixesTestCase(unittest.TestCase):
         self.assertTrue(status.auto_stopped)
 
         session = self.db.query(WorkSession).first()
-        self.assertEqual(session.end_time, base_now + timedelta(hours=10))
-        self.assertEqual(session.net_seconds, MAX_DAILY_SECONDS)
+        self.assertEqual(session.end_time, base_now + timedelta(hours=10, minutes=30))
+        self.assertEqual(session.net_seconds, MAX_DAILY_SECONDS + 1800)
 
     def test_auto_stop_capped_end_time_accounts_for_pauses(self) -> None:
         """A closed pause pushes the capped end time out by its duration."""
@@ -409,8 +408,8 @@ class BackendFixesTestCase(unittest.TestCase):
         self.assertEqual(session.end_time, start + timedelta(hours=11))
         self.assertEqual(session.net_seconds, MAX_DAILY_SECONDS)
 
-    def test_statistics_deduct_lunch_once_per_day(self) -> None:
-        """Two short sessions on one day share a single lunch deduction and target."""
+    def test_statistics_credit_gap_toward_lunch(self) -> None:
+        """Two sessions share a target and their gap already covers lunch."""
         now = datetime.now()
         day = now.date()
         morning = WorkSession(
@@ -433,11 +432,11 @@ class BackendFixesTestCase(unittest.TestCase):
         summary = statistics.get_statistics(self.db)
 
         self.assertEqual(summary.this_week.days_worked, 1)
-        # 8h summed net work exceeds the 6h threshold, so one 30min lunch applies
-        self.assertEqual(summary.this_week.total_seconds, 8 * 3600 - 1800)
+        # The one-hour gap covers lunch, so all eight worked hours count.
+        self.assertEqual(summary.this_week.total_seconds, 8 * 3600)
         self.assertEqual(summary.this_week.target_seconds, int(WEEKLY_HOURS * 3600 / 5))
         self.assertEqual(summary.this_month.days_worked, 1)
-        self.assertEqual(summary.this_month.total_seconds, 8 * 3600 - 1800)
+        self.assertEqual(summary.this_month.total_seconds, 8 * 3600)
 
     def test_create_manual_session(self) -> None:
         """A manually added past session is stored as completed with net seconds."""

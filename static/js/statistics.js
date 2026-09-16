@@ -24,19 +24,6 @@ async function deleteSession(sessionId) {
       return;
     }
 
-    // Remove the session item from the DOM
-    const sessionItem = document.querySelector(
-      `[data-session-id="${sessionId}"]`,
-    );
-    if (sessionItem) {
-      sessionItem.style.transition = "opacity 0.3s";
-      sessionItem.style.opacity = "0";
-      setTimeout(() => {
-        sessionItem.remove();
-        checkEmptyList();
-      }, 300);
-    }
-    // Refresh statistics after successful deletion
     await refreshStatistics();
   } catch (error) {
     console.error("Fehler beim Loeschen:", error);
@@ -47,7 +34,9 @@ async function deleteSession(sessionId) {
 async function refreshStatistics() {
   try {
     const response = await fetch("/api/statistics/summary");
+    if (!response.ok) throw new Error(`Status ${response.status}`);
     const stats = await response.json();
+    renderRecentDays(stats.recent_days);
 
     // Update weekly statistics
     const weekTotal = document.getElementById("week-total");
@@ -139,15 +128,58 @@ async function refreshStatistics() {
   }
 }
 
-function checkEmptyList() {
-  const sessionsList = document.querySelector(".sessions-list");
-  const remainingSessions = sessionsList.querySelectorAll(".session-item");
+function textElement(tag, className, text) {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.textContent = text;
+  return element;
+}
 
-  if (remainingSessions.length === 0) {
-    sessionsList.innerHTML =
-      '<p style="color: #888; text-align: center; padding: 1rem;">Noch keine abgeschlossenen Eintraege.</p>';
+function renderRecentDays(days) {
+  const list = document.querySelector('.sessions-list');
+  list.replaceChildren();
+  if (days.length === 0) {
+    list.append(textElement('p', 'summary-note', 'Noch keine abgeschlossenen Einträge.'));
+    return;
+  }
+  for (const { day, sessions } of days) {
+    const group = document.createElement('section');
+    group.className = 'workday';
+    group.dataset.day = day.date;
+    const header = document.createElement('div');
+    header.className = 'workday-header';
+    header.append(textElement('h3', 'workday-date', day.date));
+    header.append(textElement('span', 'workday-total', `${day.credited_work_formatted} angerechnet`));
+    header.append(textElement('span', `workday-overtime ${day.overtime_seconds >= 0 ? 'positive' : 'negative'}`, `${day.overtime_formatted} Überstunden`));
+    group.append(header);
+    group.append(textElement('p', 'summary-note', `Erfasst: ${day.actual_work_formatted} · Pausen inkl. Unterbrechungen: ${day.total_pause_formatted} · Automatischer Abzug: ${day.lunch_deduction_formatted}`));
+    if (day.cap_exceeded) group.append(textElement('p', 'day-notice', 'Tagesmaximum überschritten'));
+    sessions.forEach((session, index) => {
+      const row = document.createElement('div');
+      row.className = 'session-item';
+      row.dataset.sessionId = session.id;
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'session-open';
+      open.setAttribute('aria-label', `Eintrag ${index + 1} vom ${day.date} bearbeiten`);
+      open.append(textElement('span', 'date', `Eintrag ${index + 1}`));
+      open.append(textElement('span', 'times', `${session.start_time} - ${session.end_time || '--:--'}`));
+      open.append(textElement('span', 'duration', session.net_work_formatted));
+      open.addEventListener('click', () => showSessionDetails(session.id));
+      const remove = textElement('button', 'btn-delete', '✕');
+      remove.type = 'button';
+      remove.title = 'Eintrag löschen';
+      remove.setAttribute('aria-label', 'Eintrag löschen');
+      remove.addEventListener('click', () => deleteSession(session.id));
+      row.append(open, remove);
+      group.append(row);
+    });
+    list.append(group);
   }
 }
+
+const initialStatistics = document.getElementById('initial-statistics');
+if (initialStatistics) renderRecentDays(JSON.parse(initialStatistics.textContent).recent_days);
 
 // Modal functions for session details
 async function showSessionDetails(sessionId) {
@@ -176,7 +208,7 @@ async function showSessionDetails(sessionId) {
 
 function renderSessionDetails(session) {
   const overtimeClass = session.overtime_seconds >= 0 ? "positive" : "negative";
-  const overtimeLabel = "Überstunden";
+  const overtimeLabel = "Überstunden des gesamten Tages";
   const isCompleted = session.status === "completed";
 
   let html = `
@@ -202,7 +234,7 @@ function renderSessionDetails(session) {
                 <span class="value">${session.total_pause_formatted}</span>
             </div>
             <div class="detail-row">
-                <span class="label">Nettoarbeitszeit:</span>
+                <span class="label">Erfasste Arbeitszeit:</span>
                 <span class="value">${session.net_work_formatted}</span>
             </div>
             <div class="detail-row ${overtimeClass}">
@@ -359,8 +391,7 @@ async function saveNewSession() {
     }
 
     closeModal();
-    // The recent-sessions list is server-rendered, so reload to show the entry.
-    window.location.reload();
+    await refreshStatistics();
   } catch (error) {
     console.error("Fehler beim Anlegen:", error);
     alert("Fehler beim Anlegen des Eintrags.");
