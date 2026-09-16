@@ -65,7 +65,7 @@
         <button class="btn-edit" onclick="showAddSessionForm()">+ Eintrag hinzuf&uuml;gen</button>
     </div>
     <div class="sessions-list"></div>
-    <script id="initial-statistics" type="application/json">{{ stats.model_dump(mode="json") | tojson }}</script>
+    <script id="initial-statistics" type="application/json">{{ stats.model_dump(mode="json", include={"recent_days": True}) | tojson }}</script>
 </div>
 
 <!-- Session Details Modal -->

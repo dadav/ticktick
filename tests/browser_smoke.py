@@ -178,6 +178,9 @@ def main():
                     page.locator("#btn-reset").click()
                     expect(page.locator("#status-text")).to_have_text("Bereit")
                     expect(page.locator("#current-time")).to_have_text("08:00:00")
+                    expect(page.locator(".toast")).to_have_text(
+                        "Aktueller Eintrag verworfen."
+                    )
                     clear_history()
 
                     at(6)
@@ -199,6 +202,114 @@ def main():
                         "06:00 - 16:30"
                     )
 
+                    clear_history()
+                    at(12)
+                    page.goto(base_url)
+                    page.locator("#btn-start").click()
+                    expect(page.locator("#status-text")).to_have_text("Läuft")
+                    active_id = page.request.get(base_url + "/api/status").json()[
+                        "session"
+                    ]["id"]
+                    at(16)
+                    refresh()
+                    expect(page.locator("#current-time")).to_have_text("04:00:00")
+                    history_page = browser.new_page()
+                    history_page.on(
+                        "pageerror", lambda error: errors.append(str(error))
+                    )
+                    history_page.on("dialog", lambda dialog: dialog.accept())
+                    history_page.goto(base_url + "/statistics")
+                    history_page.get_by_role(
+                        "button", name="Eintrag hinzufügen"
+                    ).click()
+                    history_page.locator("#add-date").fill("2026-09-15")
+                    history_page.locator("#add-start").fill("00:00")
+                    history_page.locator("#add-end").fill("08:00")
+                    history_page.get_by_role("button", name="Speichern").click()
+                    expect(history_page.locator(".session-item")).to_have_count(2)
+                    expect(history_page.locator(".workday-total")).to_have_text(
+                        "12:00:00 angerechnet"
+                    )
+                    refresh()
+                    expect(page.locator("#status-text")).to_have_text("Bereit")
+                    expect(page.locator("#day-notice")).to_contain_text(
+                        "Tagesmaximum überschritten"
+                    )
+                    expect(page.locator("#btn-start")).to_be_disabled()
+                    details = page.request.get(
+                        base_url + f"/api/sessions/{active_id}"
+                    ).json()
+                    assert details["end_time"] == "16:00"
+                    assert details["net_work_formatted"] == "04:00"
+                    history_page.locator(".session-open").last.click()
+                    history_page.locator("#session-modal").get_by_role(
+                        "button", name="Bearbeiten"
+                    ).click()
+                    history_page.locator("#edit-end-time").fill("17:00")
+                    with (
+                        history_page.expect_event("dialog") as validation_dialog,
+                        history_page.expect_response(
+                            lambda response: response.request.method == "PUT"
+                        ) as validation_response,
+                    ):
+                        history_page.get_by_role("button", name="Speichern").click()
+                    assert validation_response.value.status == 422
+                    expect(
+                        history_page.locator(".session-item .times").last
+                    ).to_have_text("12:00 - 16:00")
+                    assert (
+                        validation_dialog.value.message
+                        == "Fehler: Der Eintrag darf nicht in der Zukunft liegen."
+                    )
+                    validation_text = history_page.evaluate("""async () => readErrorDetail(await fetch('/api/sessions', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+                    }))""")
+                    assert "Datum: Pflichtfeld fehlt." in validation_text
+                    assert "Startzeit: Pflichtfeld fehlt." in validation_text
+                    assert "Endzeit: Pflichtfeld fehlt." in validation_text
+                    history_page.locator(".modal-close").click()
+                    clear_history()
+
+                    at(12)
+                    response = page.request.post(
+                        base_url + "/api/sessions",
+                        data={
+                            "date": "2026-09-15",
+                            "start_time": "00:00",
+                            "end_time": "06:00",
+                        },
+                    )
+                    assert response.ok
+                    page.goto(base_url)
+                    page.locator("#btn-start").click()
+                    expect(page.locator("#status-text")).to_have_text("Läuft")
+                    active_id = page.request.get(base_url + "/api/status").json()[
+                        "session"
+                    ]["id"]
+                    at(15.5)
+                    history_page.reload()
+                    history_page.locator(".session-open").first.click()
+                    history_page.locator("#session-modal").get_by_role(
+                        "button", name="Bearbeiten"
+                    ).click()
+                    history_page.locator("#edit-end-time").fill("08:00")
+                    history_page.get_by_role("button", name="Speichern").click()
+                    expect(history_page.locator(".session-item")).to_have_count(2)
+                    expect(history_page.locator(".workday-total")).to_have_text(
+                        "11:30:00 angerechnet"
+                    )
+                    details = page.request.get(
+                        base_url + f"/api/sessions/{active_id}"
+                    ).json()
+                    assert details["end_time"] == "15:30"
+                    assert details["net_work_formatted"] == "03:30"
+                    refresh()
+                    expect(page.locator("#day-notice")).to_contain_text(
+                        "Tagesmaximum überschritten"
+                    )
+                    history_page.close()
+                    clear_history()
+
                     at(47)
                     page.goto(base_url)
                     page.locator("#btn-start").click()
@@ -210,7 +321,7 @@ def main():
                     assert not errors, errors
                     browser.close()
                     print(
-                        "Browser checks passed: split sessions, paused credit, history editing/addition/deletion, discard, cap, overnight date, and mobile layout."
+                        "Browser checks passed: split sessions, paused credit, history editing/addition/deletion, discard, cap, history corrections, German validation, overnight date, and mobile layout."
                     )
             finally:
                 server.should_exit = True

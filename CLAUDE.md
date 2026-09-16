@@ -65,16 +65,19 @@ app/
 
 ### Key Design Decisions
 - **Singleton timer state:** One `TimerState` record tracks current session/pause, persists across restarts
+- **Timer transactions:** Timer entry points, status polling, and history mutations acquire SQLite `BEGIN IMMEDIATE` before reading state, refresh cached ORM state, and commit or roll back once. Helpers only flush. Do not nest these entry points or pass a session with pending writes. SQLite's legacy SELECT behavior otherwise lets polling mix old timer state with newly committed history.
 - **Concurrent start protection:** `start_timer` uses a compare-and-set update on `TimerState.current_session_id` and discards losing session rows if two start requests race
 - **Pause audit trail:** Explicit pauses are stored as `PausePeriod` records linked to the session. Gaps between sessions are inferred and never saved as pause records.
 - **Daily source of truth:** Derive totals from session timestamps and pauses, never from cached `net_seconds`. New writes cache uncapped actual session work. Merge work intervals before calculating daily work so overlaps count once.
 - **Lunch credit:** After actual work exceeds the threshold, credited work equals actual work minus `max(0, lunch allowance - breaks)`. Explicit pauses and gaps contribute together, including short breaks. A gap after Stop counts only when another session starts; explicit open pauses restore credit live.
 - **Daily limits:** Both the daily target and maximum apply to credited work. Remaining durations include upcoming lunch deductions. Do not cap individual durations or manually corrected history.
 - **Cap enforcement:** Status, Pause, Continue, and Stop check the daily cap. `calculate_capped_end_time` walks work/break intervals to find the first crossing, including during a pause. Credit can drop at the lunch threshold, so binary search is invalid. Clip pauses to a backdated end. Start checks prospective gap credit without saving it.
+- **History corrections during tracking:** Enforce any existing cap before changing the active workday's history. If the correction introduces a cap crossing, stop at the correction time and preserve all active work and pauses. Save the correction and stop atomically so a concurrent poll cannot backdate against partially updated history. Create and update reject future end times.
 - **Workday boundaries:** Group by session start date in the existing local timezone. Overnight sessions stay on their starting day; no midnight split. Ignore reset sessions.
 - **History and statistics:** Aggregate completed sessions only. `recent_days` includes all sessions for the ten most recent completed dates, with daily overtime shown once. Legacy session overtime fields mean the containing day's overtime. Average start/end times use the first start and last end per day.
 - **Frontend history rendering:** One `renderRecentDays` function handles initial JSON and refreshes after all history mutations; do not duplicate the grouped markup in Jinja.
 - **HTTP semantics for session endpoints:** `POST/PUT/DELETE /api/sessions*` raise `HTTPException` (404 missing, 409 conflict, 422 validation). Timer controls keep the 200 + `success=false` pattern
+- **UI language:** `ActionResponse.message` is German. HTTP error details remain stable English API strings; `readErrorDetail` in `statistics.js` translates these and request-validation errors into German before displaying them.
 - **Naive local timestamps:** `datetime.now()` everywhere, so Docker must set `TZ`
 
 ## Configuration

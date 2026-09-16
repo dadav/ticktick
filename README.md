@@ -123,6 +123,8 @@ During an explicit Pause, credited time can increase as the real break replaces 
 
 The timer stops automatically at the credited daily maximum. If polling was delayed, it saves the time the maximum was first reached. Further starts are blocked, including when the prospective gap would restore enough lunch credit to reach the maximum immediately. Manual corrections above the maximum are preserved and flagged. Reducing a day's total can allow tracking again.
 
+If a history correction pushes the active workday to its maximum, the timer stops at the correction time and preserves the work and pauses recorded so far. New and edited entries cannot end in the future.
+
 Overnight sessions belong entirely to their starting date. A new session started after midnight belongs to the new day. Discard only removes the current session from daily calculations.
 
 ### Statistics Page

@@ -45,7 +45,7 @@ class BackendFixesTestCase(unittest.TestCase):
             result = timer.start_timer(self.db)
 
         self.assertFalse(result.success)
-        self.assertEqual(result.message, "Timer already running")
+        self.assertEqual(result.message, "Der Timer läuft bereits.")
 
         sessions = self.db.query(WorkSession).all()
         self.assertEqual(sessions, [])

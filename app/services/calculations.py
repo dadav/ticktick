@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from itertools import pairwise
 from math import ceil
 
 from app.config import (
@@ -188,7 +189,7 @@ def calculate_capped_end_time(
         {cursor, now}
         | {point for interval in work for point in interval if cursor < point < now}
     )
-    for left, right in zip(boundaries, boundaries[1:]):
+    for left, right in pairwise(boundaries):
         duration = (right - left).total_seconds()
         working = any(begin <= left < end for begin, end in work)
         if working:

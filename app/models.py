@@ -12,6 +12,7 @@ class WorkSession(Base):
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     end_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Legacy write-only cache of actual work; derive all totals from timestamps.
     net_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active", index=True

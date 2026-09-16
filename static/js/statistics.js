@@ -1,12 +1,38 @@
-// The API answers PUT/POST/DELETE errors with an HTTP error code and a
-// {"detail": "..."} body, so read the detail before touching the DOM.
+// Keep API details stable while displaying German errors in this screen.
+const sessionErrorMessages = {
+  "Session not found": "Eintrag nicht gefunden.",
+  "Cannot delete the currently active session": "Der aktive Eintrag kann nicht gelöscht werden.",
+  "Cannot edit the currently active session": "Der aktive Eintrag kann nicht bearbeitet werden.",
+  "Only completed sessions can be edited": "Nur abgeschlossene Einträge können bearbeitet werden.",
+  "No changes provided": "Keine Änderungen angegeben.",
+  "Invalid date or time format (expected YYYY-MM-DD and HH:MM)": "Bitte ein gültiges Datum und Uhrzeiten im Format HH:MM eingeben.",
+  "Invalid start_time format (expected HH:MM)": "Bitte eine gültige Startzeit im Format HH:MM eingeben.",
+  "Invalid end_time format (expected HH:MM)": "Bitte eine gültige Endzeit im Format HH:MM eingeben.",
+  "Start time must be before end time": "Die Startzeit muss vor der Endzeit liegen.",
+  "Session must be in the past": "Der Eintrag darf nicht in der Zukunft liegen.",
+  "Start time must be before the first pause": "Die Startzeit muss vor der ersten Pause liegen.",
+  "End time must be after the last pause": "Die Endzeit darf nicht vor dem Ende der letzten Pause liegen.",
+};
+
 async function readErrorDetail(response) {
   const body = await response.json().catch(() => ({}));
-  // FastAPI request validation reports detail as a list of error objects.
   if (Array.isArray(body.detail)) {
-    return body.detail.map((item) => item.msg).join(", ");
+    const fields = { date: "Datum", start_time: "Startzeit", end_time: "Endzeit", session_id: "Eintrag" };
+    return body.detail.map((item) => {
+      const field = fields[(item.loc || []).at(-1)] || "Eingabe";
+      return `${field}: ${item.type === "missing" ? "Pflichtfeld fehlt." : "Ungültige Eingabe."}`;
+    }).join(" ");
   }
-  return body.detail || response.statusText;
+  if (typeof body.detail === "string" && Object.hasOwn(sessionErrorMessages, body.detail)) {
+    return sessionErrorMessages[body.detail];
+  }
+  console.error("Unbekannter API-Fehler", { status: response.status, detail: body.detail });
+  const fallbackMessages = {
+    404: "Eintrag nicht gefunden.",
+    409: "Die Änderung ist im aktuellen Zustand nicht möglich.",
+    422: "Bitte die Eingaben prüfen.",
+  };
+  return fallbackMessages[response.status] || "Die Anfrage konnte nicht verarbeitet werden. Bitte erneut versuchen.";
 }
 
 async function deleteSession(sessionId) {
