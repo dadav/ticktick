@@ -70,9 +70,28 @@
         <span class="value" id="remaining-max">--:--:--</span>
     </div>
 </div>
+
+<details class="notifications" id="notifications">
+    <summary>Benachrichtigungen</summary>
+    <p class="notifications-hint" id="notify-unconfigured" hidden>
+        Gotify ist nicht eingerichtet. Setze <code>TICKTICK_GOTIFY_URL</code> und <code>TICKTICK_GOTIFY_TOKEN</code>, um Erinnerungen zu erhalten.
+    </p>
+    <label class="notifications-row">
+        <input type="checkbox" id="notify-enabled">
+        <span>Erinnerung, wenn bis <span id="notify-window">--:--</span> Uhr noch nicht gestartet (nur Arbeitstage)</span>
+    </label>
+    <div class="notifications-row">
+        <label for="notify-paused-until">Pausieren bis einschließlich</label>
+        <input type="date" id="notify-paused-until">
+        <button type="button" id="notify-clear-pause" class="btn btn-secondary btn-compact">Aufheben</button>
+    </div>
+    <p class="notifications-status" id="notify-status" role="status"></p>
+    <button type="button" id="notify-test" class="btn btn-secondary btn-compact">Test senden</button>
+</details>
 {% endblock %}
 
 {% block scripts %}
 <script>window.TICKTICK_CONFIG = { maxDailyLabel: "{{ max_daily_label }}" };</script>
 <script src="/static/js/timer.js?v={{ version }}"></script>
+<script src="/static/js/notifications.js?v={{ version }}"></script>
 {% endblock %}

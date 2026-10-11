@@ -23,6 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def main():
     with tempfile.TemporaryDirectory(prefix="ticktick-browser-") as directory:
         os.environ["TICKTICK_DB_PATH"] = str(Path(directory) / "test.db")
+        # Never reach a real Gotify server from tests; load_dotenv keeps these empty.
+        os.environ["TICKTICK_GOTIFY_URL"] = ""
+        os.environ["TICKTICK_GOTIFY_TOKEN"] = ""
         import uvicorn
 
         from app.services import calculations, statistics, timer
@@ -88,6 +91,10 @@ def main():
 
                     page.goto(base_url)
                     expect(page.locator("#btn-start")).to_be_enabled()
+                    page.locator("#notifications summary").click()
+                    expect(page.locator("#notify-unconfigured")).to_be_visible()
+                    expect(page.locator("#notify-enabled")).to_be_disabled()
+                    expect(page.locator("#notify-test")).to_be_disabled()
                     page.locator("#btn-start").click()
                     expect(page.locator("#status-text")).to_have_text("Läuft")
                     at(10)
@@ -321,7 +328,7 @@ def main():
                     assert not errors, errors
                     browser.close()
                     print(
-                        "Browser checks passed: split sessions, paused credit, history editing/addition/deletion, discard, cap, history corrections, German validation, overnight date, and mobile layout."
+                        "Browser checks passed: split sessions, paused credit, history editing/addition/deletion, discard, cap, history corrections, German validation, overnight date, notification settings, and mobile layout."
                     )
             finally:
                 server.should_exit = True

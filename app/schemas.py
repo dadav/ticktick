@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel
 
 
@@ -145,3 +145,23 @@ class SessionDetailResponse(BaseModel):
     status: str
     pause_count: int
     pauses: list[PausePeriodInfo]
+
+
+class NotificationSettingsResponse(BaseModel):
+    configured: bool  # Gotify URL and token are set
+    enabled: bool
+    paused_until: date | None  # Inclusive; expired pauses are returned as None
+    reminder_time: str  # HH:MM format
+    reminder_cutoff: str  # HH:MM format
+    today_is_workday: bool
+    today_holiday: str | None
+
+
+class NotificationSettingsUpdate(BaseModel):
+    enabled: bool
+    paused_until: date | None = None  # Past dates are normalized to None
+
+
+class NotificationTestResponse(BaseModel):
+    success: bool
+    message: str

@@ -13,6 +13,7 @@ A self-hosted work time tracking application built with Python and FastAPI.
   - Automatic lunch deduction after 6 hours, reduced by recorded pauses and gaps
   - Automatic stop at the credited daily maximum, including earlier sessions
 - **Statistics Page**: View weekly and monthly work summaries
+- **Start Reminder**: Optional Gotify push on workdays if you forgot to start the timer
 - **Docker Ready**: Easy deployment with Docker Compose
 
 ## Quick Start
@@ -66,6 +67,14 @@ cp .env.example .env
 | `TICKTICK_LUNCH_DURATION`  | `30`                 | Lunch break duration in minutes           |
 | `TICKTICK_HOST`            | `0.0.0.0`            | Server bind address                       |
 | `TICKTICK_PORT`            | `8000`               | Server port                               |
+| `TICKTICK_GOTIFY_URL`      | (empty)              | Gotify server URL; reminders need URL and token |
+| `TICKTICK_GOTIFY_TOKEN`    | (empty)              | Gotify application token                  |
+| `TICKTICK_GOTIFY_PRIORITY` | `5`                  | Gotify message priority                   |
+| `TICKTICK_REMINDER_TIME`   | `09:00`              | Start of the reminder window (HH:MM)      |
+| `TICKTICK_REMINDER_CUTOFF` | `12:00`              | No reminder from this time on (HH:MM)     |
+| `TICKTICK_REMINDER_WEEKDAYS` | `mon,tue,wed,thu,fri` | Weekdays that count as workdays      |
+| `TICKTICK_HOLIDAY_COUNTRY` | `DE`                 | Public holiday country; empty disables    |
+| `TICKTICK_HOLIDAY_SUBDIV`  | (empty)              | Holiday subdivision, e.g. `BY` or `NW`    |
 | `TZ`                       | `Europe/Berlin`      | Container timezone (Docker only)          |
 
 ### Examples
@@ -127,6 +136,14 @@ If a history correction pushes the active workday to its maximum, the timer stop
 
 Overnight sessions belong entirely to their starting date. A new session started after midnight belongs to the new day. Discard only removes the current session from daily calculations.
 
+### Start reminder (Gotify)
+
+Set `TICKTICK_GOTIFY_URL` and `TICKTICK_GOTIFY_TOKEN` (an application token) to get a push notification when no work has been recorded yet on a workday. The reminder is due from `TICKTICK_REMINDER_TIME` until `TICKTICK_REMINDER_CUTOFF`; if TickTick was offline at the reminder time, it catches up as long as the cutoff has not passed. Workdays are the configured weekdays minus public holidays of `TICKTICK_HOLIDAY_COUNTRY`/`TICKTICK_HOLIDAY_SUBDIV`.
+
+At most one reminder is sent per day. If Gotify is clearly unreachable (connection refused, DNS failure, HTTP 5xx or 429), it retries every minute until the cutoff. On a timeout or other ambiguous failure it does not retry, so you never get duplicates.
+
+Open **Benachrichtigungen** on the timer page to turn reminders off, pause them through a date (e.g. for a holiday; they resume automatically the day after), or send a test message.
+
 ### Statistics Page
 
 View your work history including:
@@ -154,6 +171,9 @@ Existing history is recalculated from recorded timestamps and pauses using the s
 | `GET`    | `/api/sessions/{id}`      | Get session details with pause periods |
 | `PUT`    | `/api/sessions/{id}`      | Update start/end time of a session     |
 | `DELETE` | `/api/sessions/{id}`      | Delete a non-active session            |
+| `GET`    | `/api/notifications`      | Get start reminder settings            |
+| `PUT`    | `/api/notifications`      | Enable/disable or pause reminders      |
+| `POST`   | `/api/notifications/test` | Send a Gotify test message             |
 
 `GET /api/status` includes a `day` summary even while idle if there are completed sessions today, plus `can_start` and `start_blocked_reason`. `session` describes only the active entry; `calculations` uses daily totals and has null finish estimates while idle. With an active overnight entry, `day.date` is its starting date.
 

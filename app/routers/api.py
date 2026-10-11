@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -9,9 +11,15 @@ from app.schemas import (
     SessionDetailResponse,
     SessionCreateRequest,
     SessionUpdateRequest,
+    NotificationSettingsResponse,
+    NotificationSettingsUpdate,
+    NotificationTestResponse,
 )
+from app.config import GOTIFY_CONFIGURED
 from app.services import timer
 from app.services import statistics
+from app.services import notifications
+from app.services.gotify import GotifyError
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -85,3 +93,33 @@ def update_session(
 def delete_session(session_id: int, db: Session = Depends(get_db)):
     """Delete a work session by ID"""
     return timer.delete_session(db, session_id)
+
+
+@router.get("/notifications", response_model=NotificationSettingsResponse)
+def get_notification_settings(db: Session = Depends(get_db)):
+    """Get start reminder settings and today's workday status"""
+    return notifications.get_settings(db, datetime.now())
+
+
+@router.put("/notifications", response_model=NotificationSettingsResponse)
+def update_notification_settings(
+    body: NotificationSettingsUpdate, db: Session = Depends(get_db)
+):
+    """Enable/disable start reminders or pause them through a date"""
+    return notifications.update_settings(
+        db, body.enabled, body.paused_until, datetime.now()
+    )
+
+
+@router.post("/notifications/test", response_model=NotificationTestResponse)
+def send_test_notification():
+    """Send a test message to Gotify"""
+    if not GOTIFY_CONFIGURED:
+        raise HTTPException(status_code=409, detail="Gotify is not configured")
+    try:
+        notifications.send_test_message()
+    except GotifyError as error:
+        raise HTTPException(status_code=502, detail="Gotify request failed") from error
+    return NotificationTestResponse(
+        success=True, message="Testbenachrichtigung gesendet."
+    )

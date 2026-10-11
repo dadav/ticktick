@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def _timer_transaction(db: Session) -> Iterator[None]:
+def timer_transaction(db: Session) -> Iterator[None]:
     """Serialize cap decisions and history writes before reading timer state.
 
     SQLite's legacy driver does not begin transactions for SELECT. An explicit
@@ -163,7 +163,7 @@ def _enforce_daily_cap(
 
 
 def get_status(db: Session) -> StatusResponse:
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
         session = get_active_session(db)
         now = datetime.now()
@@ -237,7 +237,7 @@ def get_status(db: Session) -> StatusResponse:
 
 
 def start_timer(db: Session) -> ActionResponse:
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
         if state.current_session_id:
             return ActionResponse(
@@ -286,7 +286,7 @@ def start_timer(db: Session) -> ActionResponse:
 
 
 def pause_timer(db: Session) -> ActionResponse:
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
         session = get_active_session(db)
         if not session:
@@ -314,7 +314,7 @@ def pause_timer(db: Session) -> ActionResponse:
 
 
 def continue_timer(db: Session) -> ActionResponse:
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
         session = get_active_session(db)
         if not session:
@@ -344,7 +344,7 @@ def continue_timer(db: Session) -> ActionResponse:
 
 
 def stop_timer(db: Session) -> ActionResponse:
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
         session = get_active_session(db)
         if not session:
@@ -367,7 +367,7 @@ def stop_timer(db: Session) -> ActionResponse:
 
 
 def reset_timer(db: Session) -> ActionResponse:
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
         session = get_active_session(db)
         if not session:
@@ -389,7 +389,7 @@ def create_manual_session(
     db: Session, date_str: str, start_time: str, end_time: str
 ) -> ActionResponse:
     """Create a completed session for a past day (manual entry)"""
-    with _timer_transaction(db):
+    with timer_transaction(db):
         try:
             session_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             start_hour, start_minute = map(int, start_time.split(":"))
@@ -441,7 +441,7 @@ def create_manual_session(
 
 def delete_session(db: Session, session_id: int) -> ActionResponse:
     """Delete a completed work session by ID"""
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
 
         # Cannot delete the currently active session
@@ -470,7 +470,7 @@ def update_session(
     db: Session, session_id: int, start_time: str | None, end_time: str | None
 ) -> ActionResponse:
     """Update start_time and/or end_time of a completed session, recalculating net_seconds."""
-    with _timer_transaction(db):
+    with timer_transaction(db):
         state = get_or_create_timer_state(db)
 
         # Block editing the active session

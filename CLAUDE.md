@@ -49,10 +49,12 @@ app/
 │   ├── calculations.py # Shared daily interval math, lunch credit, cap crossings
 │   ├── workdays.py     # Load full days with eagerly loaded pause periods
 │   ├── statistics.py   # Weekly/monthly aggregations
+│   ├── notifications.py # Start reminder settings, workday check, reminder loop
+│   ├── gotify.py       # Gotify HTTP client with retry classification
 │   └── timer.py        # Timer state machine (idle → running → paused)
 ├── config.py           # Environment variable configuration
 ├── database.py         # SQLAlchemy setup
-├── models.py           # ORM models: WorkSession, PausePeriod, TimerState
+├── models.py           # ORM models: WorkSession, PausePeriod, TimerState, NotificationSettings
 └── schemas.py          # Pydantic response schemas
 ```
 
@@ -78,6 +80,9 @@ app/
 - **Frontend history rendering:** One `renderRecentDays` function handles initial JSON and refreshes after all history mutations; do not duplicate the grouped markup in Jinja.
 - **HTTP semantics for session endpoints:** `POST/PUT/DELETE /api/sessions*` raise `HTTPException` (404 missing, 409 conflict, 422 validation). Timer controls keep the 200 + `success=false` pattern
 - **UI language:** `ActionResponse.message` is German. HTTP error details remain stable English API strings; `readErrorDetail` in `statistics.js` translates these and request-validation errors into German before displaying them.
+- **Start reminder:** Lifespan runs a 60s loop only when Gotify URL and token are set. Due on workdays (configured weekdays minus `holidays` calendar) in `[REMINDER_TIME, REMINDER_CUTOFF)` while the timer is idle and no non-reset session exists today. At-most-once: claim `last_start_reminder_date` in `timer_transaction`, send outside it, release the claim only for `GotifyError.retryable` (refused/DNS/5xx/429). Timeouts and crashes after the claim never resend.
+- **Notification settings:** `NotificationSettings` singleton (id=1). Expired `paused_until` is normalized to null on every read/write, and PUT accepts past dates as null so stale pages never get a 422.
+- **Tests never reach Gotify:** Unit tests patch `gotify.send_message`; `tests/browser_smoke.py` blanks the Gotify env vars before importing the app.
 - **Naive local timestamps:** `datetime.now()` everywhere, so Docker must set `TZ`
 
 ## Configuration
@@ -88,6 +93,9 @@ All settings via environment variables (prefix `TICKTICK_`):
 - `TICKTICK_MAX_DAILY_HOURS`: Daily cap (default: 10)
 - `TICKTICK_LUNCH_THRESHOLD`: Hours before lunch deduction (default: 6)
 - `TICKTICK_LUNCH_DURATION`: Lunch minutes (default: 30)
+- `TICKTICK_GOTIFY_URL`, `TICKTICK_GOTIFY_TOKEN`, `TICKTICK_GOTIFY_PRIORITY` (default: 5): start reminder push target
+- `TICKTICK_REMINDER_TIME` / `TICKTICK_REMINDER_CUTOFF`: reminder window (default: 09:00 / 12:00)
+- `TICKTICK_REMINDER_WEEKDAYS` (default: `mon,tue,wed,thu,fri`), `TICKTICK_HOLIDAY_COUNTRY` (default: `DE`), `TICKTICK_HOLIDAY_SUBDIV`
 
 Docker also honors `TZ` (default `Europe/Berlin`); without it the container computes all times in UTC.
 
@@ -106,6 +114,9 @@ Docker also honors `TZ` (default `Europe/Berlin`); without it the container comp
 | GET | `/api/sessions/{id}` | Get session details with pause periods (404 if missing) |
 | PUT | `/api/sessions/{id}` | Update start/end time of a completed session (404/409/422) |
 | DELETE | `/api/sessions/{id}` | Delete a non-active session by ID (404 missing, 409 if active) |
+| GET | `/api/notifications` | Start reminder settings + today's workday/holiday |
+| PUT | `/api/notifications` | Set `enabled` and `paused_until` (past dates become null) |
+| POST | `/api/notifications/test` | Send Gotify test message (409 unconfigured, 502 Gotify failure) |
 
 ## CI/CD
 

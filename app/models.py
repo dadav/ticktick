@@ -51,3 +51,16 @@ class TimerState(Base):
     )
     is_running: Mapped[bool] = mapped_column(Boolean, default=False)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class NotificationSettings(Base):
+    """Singleton (id=1) holding UI-controlled reminder state."""
+
+    __tablename__ = "notification_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Reminders are skipped through this date (inclusive); expired dates are cleared.
+    paused_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Claimed before sending, so each day gets at most one start reminder.
+    last_start_reminder_date: Mapped[date | None] = mapped_column(Date, nullable=True)
