@@ -1,12 +1,14 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas import (
     StatusResponse,
     ActionResponse,
+    HealthResponse,
     StatisticsResponse,
     SessionDetailResponse,
     SessionCreateRequest,
@@ -22,6 +24,13 @@ from app.services import notifications
 from app.services.gotify import GotifyError
 
 router = APIRouter(prefix="/api", tags=["api"])
+
+
+@router.get("/health", response_model=HealthResponse)
+def health(db: Session = Depends(get_db)):
+    """Liveness probe: confirms SQLite is readable without the timer write lock"""
+    db.execute(text("SELECT 1"))
+    return HealthResponse(status="ok")
 
 
 @router.get("/status", response_model=StatusResponse)

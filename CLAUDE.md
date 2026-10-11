@@ -83,6 +83,7 @@ app/
 - **Start reminder:** Lifespan runs a 60s loop only when Gotify URL and token are set. Due on workdays (configured weekdays minus `holidays` calendar) in `[REMINDER_TIME, REMINDER_CUTOFF)` while the timer is idle and no non-reset session exists today. At-most-once: claim `last_start_reminder_date` in `timer_transaction`, send outside it, release the claim only for `GotifyError.retryable` (refused/DNS/5xx/429). Timeouts and crashes after the claim never resend.
 - **Notification settings:** `NotificationSettings` singleton (id=1). Expired `paused_until` is normalized to null on every read/write, and PUT accepts past dates as null so stale pages never get a 422.
 - **Tests never reach Gotify:** Unit tests patch `gotify.send_message`; `tests/browser_smoke.py` blanks the Gotify env vars before importing the app.
+- **Health probe:** Docker healthchecks use `/api/health`, a plain `SELECT 1`. Never point them at `/api/status`: it takes the `BEGIN IMMEDIATE` lock and can auto-stop at the cap.
 - **Naive local timestamps:** `datetime.now()` everywhere, so Docker must set `TZ`
 
 ## Configuration
@@ -103,6 +104,7 @@ Docker also honors `TZ` (default `Europe/Berlin`); without it the container comp
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/health` | Liveness probe (`SELECT 1`, no timer transaction) |
 | GET | `/api/status` | Current timer state + calculations |
 | POST | `/api/start` | Start new session |
 | POST | `/api/pause` | Pause current session |

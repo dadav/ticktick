@@ -484,6 +484,19 @@ class BackendFixesTestCase(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 422)
 
+    def test_health_reads_database_without_touching_timer_state(self) -> None:
+        state = TimerState(
+            id=1, is_running=False, is_paused=False, current_session_id=None
+        )
+        self.db.add(state)
+        self.db.commit()
+
+        result = api.health(self.db)
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(self.db.query(WorkSession).count(), 0)
+        self.assertEqual(self.db.query(TimerState).count(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

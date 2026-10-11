@@ -161,6 +161,7 @@ Existing history is recalculated from recorded timestamps and pauses using the s
 
 | Method   | Endpoint                  | Description                            |
 | -------- | ------------------------- | -------------------------------------- |
+| `GET`    | `/api/health`             | Liveness probe (no timer lock)         |
 | `GET`    | `/api/status`             | Get current timer status               |
 | `POST`   | `/api/start`              | Start a new session                    |
 | `POST`   | `/api/pause`              | Pause the current session              |

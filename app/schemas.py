@@ -61,6 +61,10 @@ class StatusResponse(BaseModel):
     start_blocked_reason: str | None = None
 
 
+class HealthResponse(BaseModel):
+    status: str
+
+
 class ActionResponse(BaseModel):
     success: bool
     message: str
