@@ -280,7 +280,8 @@ class HistoryCorrectionsTest(unittest.TestCase):
             status = reader.result(timeout=5)
             self.assertEqual(status.status, "idle")
             self.assertTrue(status.day.cap_exceeded)
-            self.assertEqual(status.day.credited_work_seconds, 12 * 3600)
+            # The 08:00-12:00 gap starts after the lunch threshold, so lunch still applies.
+            self.assertEqual(status.day.credited_work_seconds, int(11.5 * 3600))
         with self.Session() as observer:
             active = (
                 observer.query(WorkSession)

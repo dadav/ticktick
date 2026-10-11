@@ -104,11 +104,8 @@ def start_blocked_reason(sessions: list[WorkSession], now: datetime) -> str | No
     day = calculate_day(sessions, now)
     if day and day.cap_reached:
         return "Tagesmaximum erreicht. Heute ist keine weitere Erfassung möglich."
-    # This provisional session counts the gap without persisting it.
-    candidate = WorkSession(date=now.date(), start_time=now, status="active")
-    resumed = calculate_day([*sessions, candidate], now)
-    if resumed.cap_reached:
-        return "Mit der Pausengutschrift wäre das Tagesmaximum bereits erreicht. Kein weiterer Start möglich."
+    # A gap only adds lunch credit if it starts at or below the lunch threshold,
+    # where credit already equals actual work, so a new start cannot reach the cap.
     return None
 
 

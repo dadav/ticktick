@@ -99,6 +99,33 @@ class WorkdayCalculationsTest(unittest.TestCase):
             )
         self.assertEqual(result, datetime(2026, 9, 15, 12))
 
+    def test_gap_after_lunch_threshold_adds_no_lunch_credit(self):
+        day = self.day([self.session(8, 16), self.session(20, 21)])
+        self.assertEqual(day.actual_work_seconds, 9 * 3600)
+        self.assertEqual(day.credited_work_seconds, int(8.5 * 3600))
+        self.assertEqual(day.lunch_deduction_seconds, 1800)
+        self.assertEqual(day.total_pause_seconds, 4 * 3600)
+        self.assertEqual(day.pause_count, 1)
+
+    def test_gap_starting_exactly_at_lunch_threshold_counts(self):
+        day = self.day([self.session(8, 14), self.session(15, 17)])
+        self.assertEqual(day.credited_work_seconds, 8 * 3600)
+        self.assertEqual(day.lunch_deduction_seconds, 0)
+
+    def test_explicit_pause_after_lunch_threshold_still_counts(self):
+        day = self.day([self.session(8, 17, [(15, 15.5)])])
+        self.assertEqual(day.actual_work_seconds, int(8.5 * 3600))
+        self.assertEqual(day.lunch_deduction_seconds, 0)
+
+    def test_cap_after_late_gap_requires_lunch_deduction(self):
+        active = self.session(19, 23)
+        active.end_time = None
+        active.status = "active"
+        result = calculations.calculate_capped_end_time(
+            [self.session(6, 15), active], active, datetime(2026, 9, 15, 22)
+        )
+        self.assertEqual(result, datetime(2026, 9, 15, 20, 30))
+
     def test_session_duration_ignores_stale_cache(self):
         session = self.session(6, 16.5)
         session.net_seconds = 10 * 3600
@@ -173,7 +200,8 @@ class WorkdayTimerTest(unittest.TestCase):
         self.assertIsNone(later.calculations.normal_leave)
         self.at(14, timer.start_timer)
         restarted = self.at(14, timer.get_status)
-        self.assertEqual(restarted.day.credited_work_seconds, 7 * 3600)
+        # The gap starts after the lunch threshold, so it adds no lunch credit.
+        self.assertEqual(restarted.day.credited_work_seconds, int(6.5 * 3600))
         self.assertEqual(restarted.day.session_count, 2)
 
     def test_pause_restores_lunch_credit_live(self):
@@ -221,15 +249,23 @@ class WorkdayTimerTest(unittest.TestCase):
         self.assertEqual(latest.net_seconds, 2 * 3600)
         self.assertEqual(status.day.credited_work_seconds, 10 * 3600)
 
-    def test_start_checks_gap_credit_without_saving_gap(self):
+    def test_late_gap_does_not_restore_lunch_credit_on_restart(self):
         self.at(6, timer.start_timer)
         self.at(16 + 20 / 60, timer.stop_timer)
-        status = self.at(17, timer.get_status)
-        self.assertEqual(status.day.credited_work_seconds, 9 * 3600 + 50 * 60)
-        self.assertFalse(status.can_start)
-        self.assertIn("Pausengutschrift", status.start_blocked_reason)
-        self.assertFalse(self.at(17, timer.start_timer).success)
-        self.assertEqual(self.db.query(WorkSession).count(), 1)
+        stopped = self.at(17, timer.get_status)
+        self.assertEqual(stopped.day.credited_work_seconds, 9 * 3600 + 50 * 60)
+        self.assertTrue(stopped.can_start)
+        self.assertTrue(self.at(17, timer.start_timer).success)
+        started = self.at(17, timer.get_status)
+        self.assertEqual(started.status, "running")
+        self.assertFalse(started.auto_stopped)
+        self.assertEqual(started.day.credited_work_seconds, 9 * 3600 + 50 * 60)
+        self.assertEqual(started.calculations.latest_leave, "17:10")
+        capped = self.at(18, timer.get_status)
+        self.assertTrue(capped.auto_stopped)
+        self.assertEqual(capped.day.credited_work_seconds, 10 * 3600)
+        latest = self.db.query(WorkSession).order_by(WorkSession.id.desc()).first()
+        self.assertEqual(latest.end_time, self.origin + timedelta(hours=17 + 10 / 60))
         self.assertEqual(self.db.query(PausePeriod).count(), 0)
 
     def test_cap_can_be_reached_during_pause(self):

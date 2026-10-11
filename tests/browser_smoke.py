@@ -235,7 +235,7 @@ def main():
                     history_page.get_by_role("button", name="Speichern").click()
                     expect(history_page.locator(".session-item")).to_have_count(2)
                     expect(history_page.locator(".workday-total")).to_have_text(
-                        "12:00:00 angerechnet"
+                        "11:30:00 angerechnet"
                     )
                     refresh()
                     expect(page.locator("#status-text")).to_have_text("Bereit")
@@ -303,7 +303,7 @@ def main():
                     history_page.get_by_role("button", name="Speichern").click()
                     expect(history_page.locator(".session-item")).to_have_count(2)
                     expect(history_page.locator(".workday-total")).to_have_text(
-                        "11:30:00 angerechnet"
+                        "11:00:00 angerechnet"
                     )
                     details = page.request.get(
                         base_url + f"/api/sessions/{active_id}"

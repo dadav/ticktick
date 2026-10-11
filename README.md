@@ -10,7 +10,7 @@ A self-hosted work time tracking application built with Python and FastAPI.
 - **Smart Calculations**:
   - Daily target finish time (8h 12m daily requirement for 41h/week)
   - Latest leave time (max 10 hours/day)
-  - Automatic lunch deduction after 6 hours, reduced by recorded pauses and gaps
+  - Automatic lunch deduction after 6 hours, reduced by recorded pauses and gaps that start before the threshold
   - Automatic stop at the credited daily maximum, including earlier sessions
 - **Statistics Page**: View weekly and monthly work summaries
 - **Start Reminder**: Optional Gotify push on workdays if you forgot to start the timer
@@ -122,15 +122,16 @@ The page displays:
 
 Each Start creates a separate entry. Daily calculations combine entries with the same starting date and count overlapping work only once. Gaps between entries count as pauses when the next entry starts. Time after the final Stop does not add break credit.
 
-After more than six hours of actual work, TickTick deducts only the missing part of the configured lunch allowance. All recorded pauses and gaps add up toward that allowance:
+After more than six hours of actual work, TickTick deducts only the missing part of the configured lunch allowance. All recorded pauses add up toward that allowance. A gap between entries counts only if it starts while actual work so far is at or below the lunch threshold, because lunch taken without pressing Pause is assumed to be inside the earlier work. Gaps still appear in the displayed pause totals:
 
 - Four hours of work, a two-hour gap, then four more hours count as eight credited hours.
+- 08:00 to 16:00, Stop, then 20:00 to 21:00 counts as eight and a half credited hours: the evening gap starts after eight worked hours and does not replace the lunch deduction.
 - Twenty minutes of recorded breaks leave ten minutes of automatic deduction with the default settings.
 - An uninterrupted 06:00 to 16:30 session counts as ten credited hours and reaches the daily maximum.
 
 During an explicit Pause, credited time can increase as the real break replaces the automatic deduction. Actual recorded work stays frozen. Remaining durations and finish estimates include any lunch deduction still needed; paused estimates assume immediate continuation. Finish estimates are hidden while stopped.
 
-The timer stops automatically at the credited daily maximum. If polling was delayed, it saves the time the maximum was first reached. Further starts are blocked, including when the prospective gap would restore enough lunch credit to reach the maximum immediately. Manual corrections above the maximum are preserved and flagged. Reducing a day's total can allow tracking again.
+The timer stops automatically at the credited daily maximum. If polling was delayed, it saves the time the maximum was first reached. Further starts are blocked. Manual corrections above the maximum are preserved and flagged. Reducing a day's total can allow tracking again.
 
 If a history correction pushes the active workday to its maximum, the timer stops at the correction time and preserves the work and pauses recorded so far. New and edited entries cannot end in the future.
 
@@ -154,7 +155,7 @@ View your work history including:
 - Independent session editing and deletion, with totals refreshed immediately
 - Average start/end times based on each day’s first start and last end
 
-Existing history is recalculated from recorded timestamps and pauses using the same rules. Historical totals can change where old calculations deducted lunch twice or capped individual session durations. Stored timestamps are preserved and no database migration is required. Weekly and monthly summaries continue to include completed sessions only.
+Existing history is recalculated from recorded timestamps and pauses using the same rules. Historical totals can change where old calculations deducted lunch twice or capped individual session durations. Days with a gap that started after the lunch threshold lose that lunch credit, which can lower daily, weekly, and monthly credited totals. Stored timestamps are preserved and no database migration is required. Weekly and monthly summaries continue to include completed sessions only.
 
 ## API Endpoints
 

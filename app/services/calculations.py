@@ -122,6 +122,34 @@ def day_timeline(
     return start, end, work
 
 
+def seconds_before(intervals: list[Interval], point: datetime) -> float:
+    return interval_seconds(
+        [(left, min(right, point)) for left, right in intervals if left < point]
+    )
+
+
+def late_gaps(
+    sessions: list[WorkSession], work: list[Interval], now: datetime
+) -> list[Interval]:
+    """Gaps between sessions that start after the lunch threshold.
+
+    Late gaps never contribute lunch credit, but they still appear as displayed
+    breaks. Spans are walked directly instead of merged because merge_intervals
+    drops zero-length spans, such as an active session started exactly at now.
+    """
+    ordered = sorted(sessions, key=lambda item: item.start_time)
+    if not ordered:
+        return []
+    gaps = []
+    covered_until = ordered[0].start_time
+    for session in ordered:
+        if session.start_time > covered_until:
+            gaps.append((covered_until, session.start_time))
+        covered_until = max(covered_until, session.end_time or now)
+    threshold = LUNCH_THRESHOLD_HOURS * 3600
+    return [gap for gap in gaps if seconds_before(work, gap[0]) > threshold]
+
+
 def calculate_day(sessions: list[WorkSession], now: datetime) -> DailySummary | None:
     sessions = [
         session for session in sessions if session.status in ("completed", "active")
@@ -132,11 +160,14 @@ def calculate_day(sessions: list[WorkSession], now: datetime) -> DailySummary | 
     breaks = interval_gaps(start, end, work)
     actual = interval_seconds(work)
     break_seconds = interval_seconds(breaks)
-    credited = credited_seconds(actual, break_seconds)
+    credit_break_seconds = break_seconds - interval_seconds(
+        late_gaps(sessions, work, now)
+    )
+    credited = credited_seconds(actual, credit_break_seconds)
     target = int(DAILY_REQUIREMENT_MINUTES * 60)
-    remaining_daily = ceil(remaining_work_seconds(actual, break_seconds, target))
+    remaining_daily = ceil(remaining_work_seconds(actual, credit_break_seconds, target))
     remaining_max = ceil(
-        remaining_work_seconds(actual, break_seconds, MAX_DAILY_SECONDS)
+        remaining_work_seconds(actual, credit_break_seconds, MAX_DAILY_SECONDS)
     )
     overtime = int(credited) - target
     return DailySummary(
@@ -155,7 +186,7 @@ def calculate_day(sessions: list[WorkSession], now: datetime) -> DailySummary | 
         lunch_deduction_formatted=format_duration(int(actual - credited)),
         lunch_break_applies=actual > LUNCH_THRESHOLD_HOURS * 3600,
         remaining_for_earliest_seconds=ceil(
-            remaining_work_seconds(actual, break_seconds, MIN_WORK_HOURS * 3600)
+            remaining_work_seconds(actual, credit_break_seconds, MIN_WORK_HOURS * 3600)
         ),
         remaining_for_daily_seconds=remaining_daily,
         remaining_for_daily=format_duration(remaining_daily),
@@ -179,10 +210,10 @@ def calculate_capped_end_time(
     """
     start, _, work = day_timeline(sessions, now)
     cursor = active.start_time
-    worked = interval_seconds(
-        [(left, min(right, cursor)) for left, right in work if left < cursor]
-    )
-    breaks = (cursor - start).total_seconds() - worked
+    worked = seconds_before(work, cursor)
+    # The active session spans cursor..now, so every late gap lies before cursor.
+    late = seconds_before(late_gaps(sessions, work, now), cursor)
+    breaks = (cursor - start).total_seconds() - worked - late
     if credited_seconds(worked, breaks) >= MAX_DAILY_SECONDS:
         return cursor
     boundaries = sorted(
