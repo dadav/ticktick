@@ -1,5 +1,13 @@
 from datetime import datetime, date
-from sqlalchemy import ForeignKey, Date, DateTime, Integer, String, Boolean
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -64,3 +72,37 @@ class NotificationSettings(Base):
     paused_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Claimed before sending, so each day gets at most one start reminder.
     last_start_reminder_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class MilestoneSettings(Base):
+    """Singleton (id=1) holding which work milestones send a notification."""
+
+    __tablename__ = "milestone_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    notify_min_work: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    notify_daily_target: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    notify_daily_max: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+
+
+class MilestoneEvent(Base):
+    """One row per handled milestone of a workday; a row is never sent again.
+
+    outcome: claimed (send in progress or done), disabled, paused, stale, baseline.
+    Only a claimed row is deleted, and only after a definite non-delivery.
+    """
+
+    __tablename__ = "milestone_events"
+    __table_args__ = (UniqueConstraint("work_date", "key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    work_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    key: Mapped[str] = mapped_column(String(20), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

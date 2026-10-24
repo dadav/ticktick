@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     if config.GOTIFY_CONFIGURED:
         reminder_task = asyncio.create_task(run_reminder_loop())
     else:
-        logger.info("Gotify not configured; start reminders disabled")
+        logger.info("Gotify not configured; notifications disabled")
     yield
     if reminder_task is not None:
         reminder_task.cancel()

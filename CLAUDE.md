@@ -49,12 +49,12 @@ app/
 │   ├── calculations.py # Shared daily interval math, lunch credit, cap crossings
 │   ├── workdays.py     # Load full days with eagerly loaded pause periods
 │   ├── statistics.py   # Weekly/monthly aggregations
-│   ├── notifications.py # Start reminder settings, workday check, reminder loop
+│   ├── notifications.py # Start reminder + milestone notifications, workday check, loop
 │   ├── gotify.py       # Gotify HTTP client with retry classification
 │   └── timer.py        # Timer state machine (idle → running → paused)
 ├── config.py           # Environment variable configuration
 ├── database.py         # SQLAlchemy setup
-├── models.py           # ORM models: WorkSession, PausePeriod, TimerState, NotificationSettings
+├── models.py           # ORM models: WorkSession, PausePeriod, TimerState, NotificationSettings, MilestoneSettings, MilestoneEvent
 └── schemas.py          # Pydantic response schemas
 ```
 
@@ -81,6 +81,7 @@ app/
 - **HTTP semantics for session endpoints:** `POST/PUT/DELETE /api/sessions*` raise `HTTPException` (404 missing, 409 conflict, 422 validation). Timer controls keep the 200 + `success=false` pattern
 - **UI language:** `ActionResponse.message` is German. HTTP error details remain stable English API strings; `readErrorDetail` in `statistics.js` translates these and request-validation errors into German before displaying them.
 - **Start reminder:** Lifespan runs a 60s loop only when Gotify URL and token are set. Due on workdays (configured weekdays minus `holidays` calendar) in `[REMINDER_TIME, REMINDER_CUTOFF)` while the timer is idle and no non-reset session exists today. At-most-once: claim `last_start_reminder_date` in `timer_transaction`, send outside it, release the claim only for `GotifyError.retryable` (refused/DNS/5xx/429). Timeouts and crashes after the claim never resend.
+- **Milestone notifications:** Optional checkboxes (`MilestoneSettings`, default off) for `min_work` (actual work >= `MIN_WORK_HOURS`; credited drops right after the lunch threshold, so a periodic check would miss it), `daily_target` (`target_reached`) and `daily_max` (`cap_reached`). The same loop checks candidate workdays today, yesterday (overnight sessions stopped after midnight) and the active session's date, enforcing the cap first via `timer.enforce_daily_cap`. One `MilestoneEvent` row per (workday, key) makes delivery at-most-once: `claimed` before sending, deleted only on retryable errors; `disabled`/`paused`/`stale` rows record suppression. A milestone is `stale` once its workday ended more than 30 min ago, which bounds replay and retries. `update_settings` first records milestones reached under the old suppression as `baseline`, so enabling or unpausing never sends a passed milestone. `paused_until` mutes milestones too. The max message stays generic because idle history entries can reach the cap.
 - **Notification settings:** `NotificationSettings` singleton (id=1). Expired `paused_until` is normalized to null on every read/write, and PUT accepts past dates as null so stale pages never get a 422.
 - **Tests never reach Gotify:** Unit tests patch `gotify.send_message`; `tests/browser_smoke.py` blanks the Gotify env vars before importing the app.
 - **Health probe:** Docker healthchecks use `/api/health`, a plain `SELECT 1`. Never point them at `/api/status`: it takes the `BEGIN IMMEDIATE` lock and can auto-stop at the cap.
@@ -116,8 +117,8 @@ Docker also honors `TZ` (default `Europe/Berlin`); without it the container comp
 | GET | `/api/sessions/{id}` | Get session details with pause periods (404 if missing) |
 | PUT | `/api/sessions/{id}` | Update start/end time of a completed session (404/409/422) |
 | DELETE | `/api/sessions/{id}` | Delete a non-active session by ID (404 missing, 409 if active) |
-| GET | `/api/notifications` | Start reminder settings + today's workday/holiday |
-| PUT | `/api/notifications` | Set `enabled` and `paused_until` (past dates become null) |
+| GET | `/api/notifications` | Start reminder + milestone settings, today's workday/holiday |
+| PUT | `/api/notifications` | Set `enabled`, `paused_until` (past dates become null), optional `notify_*` flags (omitted = unchanged) |
 | POST | `/api/notifications/test` | Send Gotify test message (409 unconfigured, 502 Gotify failure) |
 
 ## CI/CD

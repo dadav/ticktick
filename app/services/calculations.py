@@ -26,6 +26,15 @@ def format_duration_short(seconds: int) -> str:
     return format_duration(seconds)[:-3]
 
 
+def format_hours_label(total_minutes: float) -> str:
+    """Format a duration in minutes as a German label, e.g. '8 Std. 12 Min.'"""
+    hours = int(total_minutes // 60)
+    minutes = int(round(total_minutes % 60))
+    if minutes:
+        return f"{hours} Std. {minutes} Min."
+    return f"{hours} Std."
+
+
 def format_time(dt: datetime) -> str:
     return dt.strftime("%H:%M")
 

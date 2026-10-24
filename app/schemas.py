@@ -159,11 +159,18 @@ class NotificationSettingsResponse(BaseModel):
     reminder_cutoff: str  # HH:MM format
     today_is_workday: bool
     today_holiday: str | None
+    notify_min_work: bool
+    notify_daily_target: bool
+    notify_daily_max: bool
 
 
 class NotificationSettingsUpdate(BaseModel):
     enabled: bool
     paused_until: date | None = None  # Past dates are normalized to None
+    # None keeps the stored value, so pages without these fields never reset them.
+    notify_min_work: bool | None = None
+    notify_daily_target: bool | None = None
+    notify_daily_max: bool | None = None
 
 
 class NotificationTestResponse(BaseModel):

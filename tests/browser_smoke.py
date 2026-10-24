@@ -94,6 +94,13 @@ def main():
                     page.locator("#notifications summary").click()
                     expect(page.locator("#notify-unconfigured")).to_be_visible()
                     expect(page.locator("#notify-enabled")).to_be_disabled()
+                    for checkbox in (
+                        "#notify-min-work",
+                        "#notify-daily-target",
+                        "#notify-daily-max",
+                    ):
+                        expect(page.locator(checkbox)).to_be_visible()
+                        expect(page.locator(checkbox)).to_be_disabled()
                     expect(page.locator("#notify-test")).to_be_disabled()
                     page.locator("#btn-start").click()
                     expect(page.locator("#status-text")).to_have_text("Läuft")

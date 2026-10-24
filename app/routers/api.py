@@ -106,7 +106,7 @@ def delete_session(session_id: int, db: Session = Depends(get_db)):
 
 @router.get("/notifications", response_model=NotificationSettingsResponse)
 def get_notification_settings(db: Session = Depends(get_db)):
-    """Get start reminder settings and today's workday status"""
+    """Get start reminder and milestone settings and today's workday status"""
     return notifications.get_settings(db, datetime.now())
 
 
@@ -114,9 +114,15 @@ def get_notification_settings(db: Session = Depends(get_db)):
 def update_notification_settings(
     body: NotificationSettingsUpdate, db: Session = Depends(get_db)
 ):
-    """Enable/disable start reminders or pause them through a date"""
+    """Toggle start reminder and milestone notifications, or pause all through a date"""
     return notifications.update_settings(
-        db, body.enabled, body.paused_until, datetime.now()
+        db,
+        body.enabled,
+        body.paused_until,
+        datetime.now(),
+        notify_min_work=body.notify_min_work,
+        notify_daily_target=body.notify_daily_target,
+        notify_daily_max=body.notify_daily_max,
     )
 
 

@@ -80,6 +80,19 @@
         <input type="checkbox" id="notify-enabled">
         <span>Erinnerung, wenn bis <span id="notify-window">--:--</span> Uhr noch nicht gestartet (nur Arbeitstage)</span>
     </label>
+    <label class="notifications-row">
+        <input type="checkbox" id="notify-min-work">
+        <span>Benachrichtigen bei {{ min_work_label }} Arbeitszeit (frühester Feierabend)</span>
+    </label>
+    <label class="notifications-row">
+        <input type="checkbox" id="notify-daily-target">
+        <span>Benachrichtigen bei Tagessoll ({{ daily_label }})</span>
+    </label>
+    <label class="notifications-row">
+        <input type="checkbox" id="notify-daily-max">
+        <span>Benachrichtigen bei Tagesmaximum ({{ max_daily_label }})</span>
+    </label>
+    <p class="notifications-hint">Ohne erfasste Mittagspause verschieben sich Tagessoll und Tagesmaximum um bis zu {{ lunch_duration_minutes }} Min.</p>
     <div class="notifications-row">
         <label for="notify-paused-until">Pausieren bis einschließlich</label>
         <input type="date" id="notify-paused-until">

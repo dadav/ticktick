@@ -48,7 +48,7 @@ def _prepare_history_change(
     if active is None or active.date != work_date:
         return None
     state = get_or_create_timer_state(db)
-    if _enforce_daily_cap(db, active, state, now):
+    if enforce_daily_cap(db, active, state, now):
         return None
     return active
 
@@ -126,7 +126,7 @@ def _finish_session(
     db.flush()
 
 
-def _enforce_daily_cap(
+def enforce_daily_cap(
     db: Session, session: WorkSession, state: TimerState, now: datetime
 ) -> bool:
     sessions = load_day_sessions(db, session.date, include_active=True)
@@ -164,7 +164,7 @@ def get_status(db: Session) -> StatusResponse:
         state = get_or_create_timer_state(db)
         session = get_active_session(db)
         now = datetime.now()
-        auto_stopped = bool(session and _enforce_daily_cap(db, session, state, now))
+        auto_stopped = bool(session and enforce_daily_cap(db, session, state, now))
         if auto_stopped:
             session = None
         work_date = session.date if session else now.date()
@@ -291,7 +291,7 @@ def pause_timer(db: Session) -> ActionResponse:
                 success=False, message="Kein aktiver Eintrag.", status="idle"
             )
         now = datetime.now()
-        if _enforce_daily_cap(db, session, state, now):
+        if enforce_daily_cap(db, session, state, now):
             return ActionResponse(
                 success=True,
                 message="Tagesmaximum erreicht. Timer automatisch gestoppt.",
@@ -319,7 +319,7 @@ def continue_timer(db: Session) -> ActionResponse:
                 success=False, message="Kein aktiver Eintrag.", status="idle"
             )
         now = datetime.now()
-        if _enforce_daily_cap(db, session, state, now):
+        if enforce_daily_cap(db, session, state, now):
             return ActionResponse(
                 success=True,
                 message="Tagesmaximum erreicht. Timer automatisch gestoppt.",
@@ -349,7 +349,7 @@ def stop_timer(db: Session) -> ActionResponse:
                 success=False, message="Kein aktiver Eintrag.", status="idle"
             )
         now = datetime.now()
-        if _enforce_daily_cap(db, session, state, now):
+        if enforce_daily_cap(db, session, state, now):
             return ActionResponse(
                 success=True,
                 message="Tagesmaximum erreicht. Timer automatisch gestoppt.",

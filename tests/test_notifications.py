@@ -1,7 +1,7 @@
 import asyncio
 import tempfile
 import unittest
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.error import HTTPError, URLError
@@ -12,10 +12,17 @@ from sqlalchemy.orm import sessionmaker
 
 import main
 from app.database import Base
-from app.models import NotificationSettings, TimerState, WorkSession
+from app.models import (
+    MilestoneEvent,
+    MilestoneSettings,
+    NotificationSettings,
+    PausePeriod,
+    TimerState,
+    WorkSession,
+)
 from app.routers import api
 from app.schemas import NotificationSettingsUpdate
-from app.services import gotify, notifications
+from app.services import gotify, notifications, timer
 
 MONDAY = date(2026, 10, 12)
 SATURDAY = date(2026, 10, 17)
@@ -291,6 +298,292 @@ class GotifyClientTest(unittest.TestCase):
             self.assertRaises(gotify.GotifyError),
         ):
             gotify.send_message("title", "message")
+
+
+TUESDAY = date(2026, 10, 13)
+
+
+def at_seconds(day: date, hour: int, minute: int, second: int) -> datetime:
+    return datetime.combine(day, time(hour, minute, second))
+
+
+class MilestoneTestCase(NotificationTestCase):
+    def start(
+        self, start: datetime, pauses: list[tuple[datetime, datetime]] = ()
+    ) -> None:
+        session = WorkSession(date=start.date(), start_time=start, status="active")
+        session.pause_periods = [
+            PausePeriod(pause_start=begin, pause_end=end) for begin, end in pauses
+        ]
+        self.db.add(session)
+        self.db.flush()
+        state = self.db.get(TimerState, 1) or TimerState(id=1)
+        state.current_session_id = session.id
+        state.is_running = True
+        state.is_paused = False
+        self.db.add(state)
+        self.db.commit()
+
+    def completed(self, start: datetime, end: datetime) -> None:
+        self.db.add(
+            WorkSession(
+                date=start.date(), start_time=start, end_time=end, status="completed"
+            )
+        )
+        self.db.commit()
+
+    def configure(self, now: datetime, paused_until: date | None = None, **flags):
+        notifications.update_settings(
+            self.db,
+            True,
+            paused_until,
+            now,
+            notify_min_work=flags.get("min_work", False),
+            notify_daily_target=flags.get("daily_target", False),
+            notify_daily_max=flags.get("daily_max", False),
+        )
+
+    def check(self, now: datetime) -> list[tuple[date, str]]:
+        sent = notifications.check_milestones(self.db, now)
+        return [(milestone.work_date, milestone.key) for milestone in sent]
+
+    def outcomes(self) -> dict[tuple[date, str], str]:
+        with self.SessionLocal() as observer:
+            return {
+                (row.work_date, row.key): row.outcome
+                for row in observer.query(MilestoneEvent)
+            }
+
+    def timer_at(self, now: datetime, action):
+        with patch("app.services.timer.datetime", wraps=datetime) as clock:
+            clock.now.return_value = now
+            return action(self.db)
+
+    def active_session_id(self) -> int | None:
+        with self.SessionLocal() as observer:
+            return observer.get(TimerState, 1).current_session_id
+
+
+class MilestoneThresholdTest(MilestoneTestCase):
+    def test_target_and_max_move_without_lunch_break(self) -> None:
+        self.configure(at(MONDAY, 8), daily_target=True, daily_max=True)
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at(MONDAY, 16, 41)), [])
+        self.assertEqual(self.check(at(MONDAY, 16, 42)), [(MONDAY, "daily_target")])
+        self.assertEqual(self.check(at(MONDAY, 18, 29)), [])
+        self.assertEqual(self.check(at(MONDAY, 18, 30)), [(MONDAY, "daily_max")])
+
+    def test_breaks_credit_toward_lunch(self) -> None:
+        # Actual work needed for 8h12 credited: 8h12 + max(0, 30 min - breaks).
+        for offset, pause_minutes in enumerate([15, 30, 60]):
+            with self.subTest(pause_minutes=pause_minutes):
+                day = MONDAY + timedelta(days=3 * offset)
+                pause = (at(day, 12), at(day, 12) + timedelta(minutes=pause_minutes))
+                self.configure(at(day, 8), daily_target=True)
+                self.start(at(day, 8), pauses=[pause])
+                needed = timedelta(hours=8, minutes=12 + max(0, 30 - pause_minutes))
+                reached = at(day, 8) + needed + timedelta(minutes=pause_minutes)
+                before = reached - timedelta(minutes=1)
+                self.assertEqual(self.check(before), [])
+                self.assertEqual(self.check(reached), [(day, "daily_target")])
+                self.timer_at(reached, timer.stop_timer)
+
+    def test_min_work_uses_actual_work_after_credit_drops(self) -> None:
+        self.configure(at(MONDAY, 8), min_work=True)
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at_seconds(MONDAY, 13, 59, 45)), [])
+        # Credited work is 5h30m45s here, actual work is past 6h.
+        self.assertEqual(
+            self.check(at_seconds(MONDAY, 14, 0, 45)), [(MONDAY, "min_work")]
+        )
+
+    def test_loop_enforces_cap_without_polling(self) -> None:
+        self.configure(at(MONDAY, 8), daily_max=True)
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at(MONDAY, 19)), [(MONDAY, "daily_max")])
+        self.assertIsNone(self.active_session_id())
+        with self.SessionLocal() as observer:
+            session = observer.query(WorkSession).one()
+            self.assertEqual(session.end_time, at(MONDAY, 18, 30))
+            self.assertEqual(session.status, "completed")
+
+
+class MilestoneDeliveryTest(MilestoneTestCase):
+    def test_sends_once_per_workday(self) -> None:
+        self.configure(at(MONDAY, 8), min_work=True)
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at(MONDAY, 14, 1)), [(MONDAY, "min_work")])
+        self.assertEqual(self.check(at(MONDAY, 14, 2)), [])
+        self.timer_at(at(MONDAY, 15), timer.stop_timer)
+
+        self.start(at(TUESDAY, 8))
+        self.assertEqual(self.check(at(TUESDAY, 14, 1)), [(TUESDAY, "min_work")])
+        self.assertEqual(self.send.call_count, 2)
+
+    def test_overnight_session_stopped_by_poll_before_check(self) -> None:
+        self.configure(at(MONDAY, 15), daily_max=True)
+        self.start(at(MONDAY, 15))
+        status = self.timer_at(at_seconds(TUESDAY, 1, 30, 5), timer.get_status)
+        self.assertTrue(status.auto_stopped)
+
+        sent = self.check(at_seconds(TUESDAY, 1, 30, 40))
+        self.assertEqual(sent, [(MONDAY, "daily_max")])
+        title, message = self.send.call_args.args
+        self.assertEqual(title, "TickTick: Tagesmaximum erreicht")
+        self.assertIn("(Arbeitstag 12.10.2026)", message)
+
+    def test_user_stops_right_after_crossing(self) -> None:
+        self.configure(at(MONDAY, 8), daily_target=True)
+        self.start(at(MONDAY, 8))
+        self.timer_at(at(MONDAY, 16, 43), timer.stop_timer)
+        self.assertEqual(
+            self.check(at_seconds(MONDAY, 16, 43, 40)), [(MONDAY, "daily_target")]
+        )
+
+    def test_overnight_retryable_failure_retries_start_day(self) -> None:
+        self.configure(at(MONDAY, 15), daily_max=True)
+        self.start(at(MONDAY, 15))
+        self.send.side_effect = [gotify.GotifyError("refused", retryable=True), None]
+        self.assertEqual(self.check(at(TUESDAY, 1, 31)), [])
+        self.assertIsNone(self.active_session_id())
+        self.assertNotIn((MONDAY, "daily_max"), self.outcomes())
+
+        self.assertEqual(self.check(at(TUESDAY, 1, 32)), [(MONDAY, "daily_max")])
+        self.assertEqual(self.check(at(TUESDAY, 1, 33)), [])
+        self.assertEqual(self.send.call_count, 2)
+
+    def test_ambiguous_failure_keeps_claim(self) -> None:
+        self.configure(at(MONDAY, 8), daily_target=True)
+        self.start(at(MONDAY, 8))
+        self.send.side_effect = gotify.GotifyError("timed out", retryable=False)
+        self.assertEqual(self.check(at(MONDAY, 16, 43)), [])
+        self.send.side_effect = None
+        self.assertEqual(self.check(at(MONDAY, 16, 44)), [])
+        self.assertEqual(self.send.call_count, 1)
+        self.assertEqual(self.outcomes()[(MONDAY, "daily_target")], "claimed")
+
+    def test_check_once_isolates_failures(self) -> None:
+        with (
+            patch.object(notifications, "SessionLocal", self.SessionLocal),
+            patch.object(
+                notifications, "check_start_reminder", side_effect=RuntimeError("boom")
+            ),
+            patch.object(notifications, "check_milestones") as milestones,
+            self.assertLogs(notifications.logger, "ERROR"),
+        ):
+            notifications._check_once()
+        milestones.assert_called_once()
+
+    def test_old_events_are_pruned(self) -> None:
+        old_day = MONDAY - timedelta(days=8)
+        self.db.add(
+            MilestoneEvent(
+                work_date=old_day,
+                key="min_work",
+                outcome="claimed",
+                recorded_at=at(old_day, 14),
+            )
+        )
+        self.db.commit()
+        self.check(at(MONDAY, 8))
+        self.assertNotIn((old_day, "min_work"), self.outcomes())
+
+
+class MilestoneSuppressionTest(MilestoneTestCase):
+    def test_enabling_after_unobserved_crossing_does_not_send(self) -> None:
+        self.configure(at(MONDAY, 8))
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at_seconds(MONDAY, 13, 59, 45)), [])
+        self.configure(at_seconds(MONDAY, 14, 0, 10), min_work=True)
+        self.assertEqual(self.check(at_seconds(MONDAY, 14, 0, 45)), [])
+        self.assertEqual(self.outcomes()[(MONDAY, "min_work")], "baseline")
+        self.send.assert_not_called()
+
+    def test_clearing_pause_after_unobserved_crossing_does_not_send(self) -> None:
+        self.configure(at(MONDAY, 8), paused_until=MONDAY, min_work=True)
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at_seconds(MONDAY, 13, 59, 45)), [])
+        self.configure(at_seconds(MONDAY, 14, 0, 10), min_work=True)
+        self.assertEqual(self.check(at_seconds(MONDAY, 14, 0, 45)), [])
+        self.assertEqual(self.outcomes()[(MONDAY, "min_work")], "baseline")
+        self.send.assert_not_called()
+
+    def test_unrelated_settings_change_keeps_due_milestone(self) -> None:
+        self.configure(at(MONDAY, 8), min_work=True)
+        self.start(at(MONDAY, 8))
+        notifications.update_settings(self.db, False, None, at(MONDAY, 14, 0))
+        self.assertEqual(self.check(at(MONDAY, 14, 1)), [(MONDAY, "min_work")])
+
+    def test_pause_mutes_milestones(self) -> None:
+        self.configure(
+            at(MONDAY, 8),
+            paused_until=MONDAY,
+            min_work=True,
+            daily_target=True,
+            daily_max=True,
+        )
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at(MONDAY, 19)), [])
+        self.assertEqual(
+            self.outcomes(),
+            {
+                (MONDAY, "min_work"): "paused",
+                (MONDAY, "daily_target"): "paused",
+                (MONDAY, "daily_max"): "paused",
+            },
+        )
+        self.send.assert_not_called()
+
+    def test_disabled_milestones_are_recorded_without_sending(self) -> None:
+        self.configure(at(MONDAY, 8), daily_max=True)
+        self.start(at(MONDAY, 8))
+        self.assertEqual(self.check(at(MONDAY, 17)), [])
+        self.assertEqual(self.outcomes()[(MONDAY, "min_work")], "disabled")
+        self.assertEqual(self.outcomes()[(MONDAY, "daily_target")], "disabled")
+
+    def test_old_manual_entry_reaching_cap_is_stale(self) -> None:
+        self.configure(at(MONDAY, 5), daily_max=True)
+        self.completed(at(MONDAY, 6), at(MONDAY, 16, 30))
+        self.assertEqual(self.check(at(MONDAY, 18)), [])
+        self.assertEqual(self.outcomes()[(MONDAY, "daily_max")], "stale")
+        self.send.assert_not_called()
+
+    def test_recent_manual_entry_reaching_cap_sends_generic_message(self) -> None:
+        self.configure(at(MONDAY, 5), daily_max=True)
+        self.completed(at(MONDAY, 7), at(MONDAY, 17, 30))
+        self.assertEqual(self.check(at(MONDAY, 17, 45)), [(MONDAY, "daily_max")])
+        _, message = self.send.call_args.args
+        self.assertIn("automatisch beendet", message)
+        self.assertNotIn("gestoppt", message)
+        self.assertNotIn("Arbeitstag", message)
+
+
+class MilestoneSettingsTest(MilestoneTestCase):
+    def test_flags_default_off_and_partial_update_keeps_them(self) -> None:
+        loaded = notifications.get_settings(self.db, at(MONDAY, 8))
+        self.assertFalse(loaded.notify_min_work)
+        self.assertFalse(loaded.notify_daily_target)
+        self.assertFalse(loaded.notify_daily_max)
+
+        with patch("app.routers.api.datetime") as clock:
+            clock.now.return_value = at(MONDAY, 8)
+            api.update_notification_settings(
+                NotificationSettingsUpdate(
+                    enabled=True, notify_daily_target=True, notify_daily_max=True
+                ),
+                self.db,
+            )
+            # A stale page without milestone fields must not reset them.
+            updated = api.update_notification_settings(
+                NotificationSettingsUpdate(enabled=False), self.db
+            )
+        self.assertFalse(updated.enabled)
+        self.assertFalse(updated.notify_min_work)
+        self.assertTrue(updated.notify_daily_target)
+        self.assertTrue(updated.notify_daily_max)
+        with self.SessionLocal() as observer:
+            stored = observer.get(MilestoneSettings, 1)
+            self.assertTrue(stored.notify_daily_target)
 
 
 class LifespanTest(unittest.TestCase):

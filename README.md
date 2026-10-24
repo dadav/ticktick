@@ -145,6 +145,16 @@ At most one reminder is sent per day. If Gotify is clearly unreachable (connecti
 
 Open **Benachrichtigungen** on the timer page to turn reminders off, pause them through a date (e.g. for a holiday; they resume automatically the day after), or send a test message.
 
+### Work milestone notifications (Gotify)
+
+The same card has optional checkboxes (off by default) for a push notification when a workday reaches:
+
+- **6 h actual work** (earliest leave),
+- **the daily target** (8 h 12 min credited with the default 41 h week),
+- **the daily maximum** (10 h credited).
+
+Target and maximum use credited work, so a missing lunch break moves them later by up to the lunch duration: without any break they fire at 8 h 42 min and 10 h 30 min of actual work, with a 15 min break at 8 h 27 min and 10 h 15 min. The background check runs every minute, also stops the timer at the daily maximum without an open browser, and sends each milestone at most once per workday. Overnight sessions count for their starting day. A milestone is only sent while its workday was active within the last 30 minutes, so restarts, late history entries, or enabling a checkbox later never replay old milestones. The pause date mutes milestones too.
+
 ### Statistics Page
 
 View your work history including:
@@ -173,8 +183,8 @@ Existing history is recalculated from recorded timestamps and pauses using the s
 | `GET`    | `/api/sessions/{id}`      | Get session details with pause periods |
 | `PUT`    | `/api/sessions/{id}`      | Update start/end time of a session     |
 | `DELETE` | `/api/sessions/{id}`      | Delete a non-active session            |
-| `GET`    | `/api/notifications`      | Get start reminder settings            |
-| `PUT`    | `/api/notifications`      | Enable/disable or pause reminders      |
+| `GET`    | `/api/notifications`      | Get reminder and milestone settings    |
+| `PUT`    | `/api/notifications`      | Toggle reminders/milestones or pause   |
 | `POST`   | `/api/notifications/test` | Send a Gotify test message             |
 
 `GET /api/status` includes a `day` summary even while idle if there are completed sessions today, plus `can_start` and `start_blocked_reason`. `session` describes only the active entry; `calculations` uses daily totals and has null finish estimates while idle. With an active overnight entry, `day.date` is its starting date.
